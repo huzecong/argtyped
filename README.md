@@ -1,4 +1,4 @@
-# `argtyped`: `argparse` with Types
+# `argtyped`: Command Line Argument Parser, with Types
 
 ![build-badge]()
 
@@ -34,27 +34,21 @@ from argtyped import Arguments, Choices, Switch
 from argtyped import Enum, auto
 
 class LoggingLevels(Enum):
-    Debug = auto()  # equivalent to `Debug = "debug"`
+    Debug = auto()
     Info = auto()
     Warning = auto()
     Error = auto()
     Critical = auto()
 
 class MyArguments(Arguments):
-    # Define a required argument of type `str`.
-    model_name: str
-    # Define an `int` argument with default value of 512.
-    hidden_size: int = 512
-    # Define an argument with a limited number of choices, equivalent to the "choice" keyword in `argparse`.
-    activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'
-    # Define an argument of an `Enum` type. The command line string "critical" will be parsed into
-    # `LoggingLevels.Critical`.
-    logging_level: LoggingLevels = LoggingLevels.Info
-    # Define a "switch" argument. In this case, the flag "--use-dropout" sets the value to `True`, and the flag
-    # "--no-use-dropout" sets it to `False`. 
-    use_dropout: Switch = True
-    # Define an optional argument. The command line string "none" will be parsed into `None`. 
-    dropout_prob: Optional[float] = 0.5
+    model_name: str         # required argument of `str` type
+    hidden_size: int = 512  # `int` argument with default value of 512
+    
+    activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
+    logging_level: LoggingLevels = LoggingLevels.Info        # using `Enum` class as choices
+
+    use_dropout: Switch = True           # "switch" argument, enable with "--use-dropout" and disable with "--no-use-dropout"
+    dropout_prob: Optional[float] = 0.5  # optional argument, "--dropout-prob=none" parses into `None`
 
 args = Arguments()
 ```
@@ -72,10 +66,13 @@ class LoggingLevels(Enum):
     Critical = "critical"
 
 parser = argparse.ArgumentParser()
+
 parser.add_argument("--model-name", type=str, required=True)
 parser.add_argument("--hidden-size", type=int, default=512)
+
 parser.add_argument("--activation", choices=["relu", "tanh", "sigmoid"], default="relu")
 parser.add_argument("--logging-level", choices=[str(item) for item in LoggingLevels], default="info")
+
 parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
 parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")
 parser.add_argument("--dropout-prob", type=lambda s: None if s.lower() == 'none' else float(s), default=0.5)

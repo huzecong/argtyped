@@ -37,8 +37,11 @@ Choices: Any = _Choices()
 
 
 class Enum(enum.Enum):
+    # pylint: disable=no-self-argument, unused-argument
     def _generate_next_value_(name, start, count, last_values):
         return name.lower()
+
+    # pylint: enable=no-self-argument, unused-argument
 
     def __eq__(self, other):
         return self.value == other or super().__eq__(other)
