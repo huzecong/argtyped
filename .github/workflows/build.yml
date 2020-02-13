@@ -30,6 +30,15 @@ jobs:
         mypy .
     - name: Unit test
       run: |
-        pip install pytest
+        pip install pytest pytest-cov
         # test against local non-installed version of library
-        python -m pytest tests/
+        python -m pytest --cov=argtyped/ --cov-report=xml
+    - name: Codecov
+      uses: codecov/codecov-action@v1.0.5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        yml: ./codecov.yml
+        fail_ci_if_error: true
