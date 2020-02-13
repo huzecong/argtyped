@@ -33,10 +33,11 @@ class LoggingLevels(enum.Enum):
 class MyArguments(Arguments):
     model_name: str
     hidden_size: int = 512
-    activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'
+    activation: Choices['relu', 'tanh', 'sigmoid'] = "relu"
     logging_level: MyLoggingLevels = MyLoggingLevels.Info
     use_dropout: Switch = True
     dropout_prob: Optional[float] = 0.5
+    label_smoothing: Optional[float]
     some_true_arg: bool
     some_false_arg: bool
 
@@ -47,6 +48,7 @@ CMD = r"""
     --logging-level=debug
     --no-use-dropout
     --dropout-prob none
+    --label-smoothing 0.1
     --some-true-arg=yes
     --some-false-arg n
     """.split()
@@ -61,12 +63,13 @@ def test_parse():
     parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
     parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")
     parser.add_argument("--dropout-prob", type=lambda s: None if s.lower() == 'none' else float(s), default=0.5)
+    parser.add_argument("--label-smoothing", type=lambda s: None if s.lower() == 'none' else float(s), default=None)
     parser.add_argument("--some-true-arg", type=_TYPE_CONVERSION_FN[bool], required=True)
     parser.add_argument("--some-false-arg", type=_TYPE_CONVERSION_FN[bool], required=True)
 
     result = dict(
-        model_name="LSTM", hidden_size=512, activation="sigmoid", logging_level=LoggingLevels.Debug,
-        use_dropout=False, dropout_prob=None,
+        model_name="LSTM", hidden_size=512, activation="sigmoid", logging_level=MyLoggingLevels.Debug,
+        use_dropout=False, dropout_prob=None, label_smoothing=0.1,
         some_true_arg=True, some_false_arg=False)
 
     namespace = parser.parse_args(CMD)

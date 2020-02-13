@@ -1,6 +1,6 @@
+import re
 from typing import Optional
 
-import argparse
 import pytest
 
 from argtyped import *
@@ -32,7 +32,7 @@ def test_switch_not_bool():
         b: Switch  # wrong
         c: Switch = 0  # wrong
 
-    with pytest.raises(ValueError, match=r"[Ss]witch argument .* default value of type bool"):
+    with pytest.raises(ValueError, match=r"Switch argument .* default value of type bool"):
         _ = Args()
 
 
@@ -42,20 +42,34 @@ def test_invalid_choice():
             a: Choices[()]
 
     class Args(Arguments):
-        a: Choices['a', 'b'] = "c"  # wrong
+        a: Choices['a'] = "b"  # wrong
 
-    with pytest.raises(ValueError, match=r"[Ii]nvalid default value for choice"):
+    with pytest.raises(ValueError, match=r"Invalid default value for choice"):
         _ = Args()
 
 
-def test_invalid_bool():
+def test_invalid_bool(capsys):
     class Args(Arguments):
         a: bool
 
     _ = Args(["--a", "True"])
     _ = Args(["--a", "Y"])
-    with pytest.raises(argparse.ArgumentError, match=r"[Ii]nvalid .* bool"):
-        try:
-            _ = Args(["--a=nah"])
-        except SystemExit:
-            pass
+    try:
+        _ = Args(["--a=nah"])
+    except SystemExit:
+        captured = capsys.readouterr()
+        assert re.search(r"Invalid value .* for bool", captured.err) is not None
+
+
+def test_invalid_type():
+    with pytest.raises(ValueError, match="Invalid type"):
+        class Args(Arguments):
+            a: 5 = 0
+
+        _ = Args()
+
+    with pytest.raises(ValueError, match="Invalid type"):
+        class Args(Arguments):
+            b: "str" = 1
+
+        _ = Args()
