@@ -31,4 +31,5 @@ jobs:
     - name: Unit test
       run: |
         pip install pytest
-        pytest
+        # test against local non-installed version of library
+        python -m pytest tests/
