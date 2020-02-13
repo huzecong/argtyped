@@ -50,7 +50,7 @@ class MyArguments(Arguments):
     activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
     logging_level: LoggingLevels = LoggingLevels.Info        # using `Enum` class as choices
 
-    use_dropout: Switch = True  # "switch" argument, enable with "--use-dropout" and disable with "--no-use-dropout"
+    use_dropout: Switch = True  # switch argument, enable with "--use-dropout" and disable with "--no-use-dropout"
     dropout_prob: Optional[float] = 0.5  # optional argument, "--dropout-prob=none" parses into `None`
 
 args = Arguments()
