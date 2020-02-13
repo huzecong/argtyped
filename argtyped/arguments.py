@@ -31,16 +31,19 @@ def _bool_conversion_fn(s: str) -> bool:
     raise ValueError(f"Invalid value '{s}' for bool argument")
 
 
-def _optional_wrapper_fn(fn: Optional[ConversionFn[T]] = None) -> ConversionFn[Optional[T]]:
+def _optional_wrapper_fn(fn: ConversionFn[T]) -> ConversionFn[Optional[T]]:
     @functools.wraps(fn)  # type: ignore  # this works even if `fn` is None
     def wrapped(s: str) -> Optional[T]:
         if s.lower() == 'none':
             return None
-        if fn is None:
-            return s  # type: ignore
         return fn(s)
 
     return wrapped
+
+
+_TYPE_CONVERSION_FN: Dict[type, Callable[[str], Any]] = {
+    bool: _bool_conversion_fn,
+}
 
 
 class Arguments:
@@ -104,20 +107,26 @@ class Arguments:
     **Note:** Advanced features such as subparsers, groups, argument lists, custom actions are not supported.
     """
 
-    _TYPE_CONVERSION_FN: Dict[type, Callable[[str], Any]] = {
-        bool: _bool_conversion_fn,
-    }
+    _annotations: Dict[str, type]
 
-    def __new__(cls, args: Optional[List[str]] = None, namespace: Optional[argparse.Namespace] = None):
+    def __init__(self, args: Optional[List[str]] = None):
         annotations: Dict[str, type] = {}
-        for base in reversed(cls.__mro__):  # used reversed order so derived classes can override base annotations
+        for base in reversed(self.__class__.mro()):
+            # Use reversed order so derived classes can override base annotations.
             if base not in [object, Arguments]:
                 annotations.update(base.__dict__.get('__annotations__', {}))
 
+        # Check if there are arguments with default values but without annotations.
+        for key in dir(self):
+            value = getattr(self, key)
+            if not key.startswith("__") and not callable(value):
+                if key not in annotations:
+                    raise ValueError(f"Argument '{key}' does not have type annotation")
+
         parser = argparse.ArgumentParser()
         for arg_name, arg_typ in annotations.items():
-            has_default = hasattr(cls, arg_name)
-            default_val = getattr(cls, arg_name, None)
+            has_default = hasattr(self.__class__, arg_name)
+            default_val = getattr(self.__class__, arg_name, None)
             nullable = is_optional(arg_typ)
             if nullable:
                 # extract the type wrapped inside `Optional`
@@ -130,6 +139,9 @@ class Arguments:
             elif not nullable and not has_default:
                 required = True
 
+            if not nullable and has_default and default_val is None:
+                raise ValueError(f"Argument '{arg_name}' has default value of None, but is not nullable")
+
             parser_arg_name = "--" + arg_name.replace("_", "-")
             parser_kwargs: Dict[str, Any] = {
                 "required": required,
@@ -139,27 +151,70 @@ class Arguments:
                     raise ValueError(f"Switch argument '{arg_name}' must have a default value of type bool")
                 _add_toggle_argument(parser, parser_arg_name, default_val)
             elif is_choices(arg_typ):
-                parser_kwargs["choices"] = arg_typ.__values__  # type: ignore
+                choices = arg_typ.__values__  # type: ignore
+                parser_kwargs["choices"] = choices
                 if has_default:
+                    if default_val not in choices:
+                        raise ValueError(f"Invalid default value for choice argument '{arg_name}'")
                     parser_kwargs["default"] = default_val
                 parser.add_argument(parser_arg_name, **parser_kwargs)
             else:
-                conversion_fn = None
-                if arg_typ in cls._TYPE_CONVERSION_FN or callable(arg_typ):
-                    conversion_fn = cls._TYPE_CONVERSION_FN.get(arg_typ, arg_typ)
+                if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
+                    raise ValueError(f"Invalid type '{arg_typ}' for argument '{arg_name}'")
+                conversion_fn = _TYPE_CONVERSION_FN.get(arg_typ, arg_typ)
                 if nullable:
                     conversion_fn = _optional_wrapper_fn(conversion_fn)
-                if conversion_fn is not None:
-                    parser_kwargs["type"] = conversion_fn
+                parser_kwargs["type"] = conversion_fn
                 if has_default:
                     parser_kwargs["default"] = default_val
                 parser.add_argument(parser_arg_name, **parser_kwargs)
 
-        if cls.__module__ != "__main__":
+        if self.__class__.__module__ != "__main__":
             # Usually arguments are defined in the same script that is directly run (__main__).
             # If this is not the case, add a note in help message indicating where the arguments are defined.
-            usage = parser.format_usage()
-            usage += f"\nNote: Arguments defined in {cls.__module__}.{cls.__name__}"
-            parser.usage = usage
+            parser.epilog = f"Note: Arguments defined in {self.__class__.__module__}.{self.__class__.__name__}"
 
-        return parser.parse_args(args, namespace)
+        namespace = parser.parse_args(args)
+        self._annotations = annotations
+        for arg_name, arg_typ in annotations.items():
+            setattr(self, arg_name, getattr(namespace, arg_name))
+
+    def to_string(self, width: Optional[int] = None, max_width: Optional[int] = None) -> str:
+        r"""Represent the arguments as a table.
+
+        :param width: Width of the printed table. Defaults to ``None``, which fits the table to its contents. An
+            exception is raised when the table cannot be drawn with the given width.
+        :param max_width: Maximum width of the printed table. Defaults to ``None``, meaning no limits. Must be ``None``
+            if :arg:`width` is not ``None``.
+        """
+        if width is not None and max_width is not None:
+            raise ValueError("`max_width` must be None when `width` is specified")
+
+        k_col = "Arguments"
+        v_col = "Values"
+        valid_keys = list(self._annotations.keys())
+        valid_vals = [repr(getattr(self, k)) for k in valid_keys]
+        max_key = max(len(k_col), max(len(k) for k in valid_keys))
+        max_val = max(len(v_col), max(len(v) for v in valid_vals))
+        margin_col = 7  # table frame & spaces
+        if width is not None:
+            max_val = width - max_key - margin_col
+        elif max_width is not None:
+            max_val = min(max_val, max_width - max_key - margin_col)
+        if max_val < len(v_col):
+            raise ValueError("Table cannot be drawn under the width constraints")
+
+        def get_row(k: str, v: str) -> str:
+            if len(v) > max_val:
+                v = v[:((max_val - 5) // 2)] + ' ... ' + v[-((max_val - 4) // 2):]
+                assert len(v) == max_val
+            return f"║ {k.ljust(max_key)} │ {v.ljust(max_val)} ║\n"
+
+        s = repr(self.__class__) + '\n'
+        s += f"╔═{'═' * max_key}═╤═{'═' * max_val}═╗\n"
+        s += get_row(k_col, v_col)
+        s += f"╠═{'═' * max_key}═╪═{'═' * max_val}═╣\n"
+        for k, v in zip(valid_keys, valid_vals):
+            s += get_row(k, v)
+        s += f"╚═{'═' * max_key}═╧═{'═' * max_val}═╝\n"
+        return s

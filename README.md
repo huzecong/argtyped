@@ -1,6 +1,6 @@
 # `argtyped`: Command Line Argument Parser, with Types
 
-![build-badge]()
+![Build Status](https://github.com/huzecong/argtyped/workflows/Build/badge.svg)
 
 `argtyped` adds type annotations to [`argparse`](https://docs.python.org/3/library/argparse.html), the command line
 argument parser library built into Python. Compared to `argparse`, this library gives you:
@@ -47,7 +47,7 @@ class MyArguments(Arguments):
     activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
     logging_level: LoggingLevels = LoggingLevels.Info        # using `Enum` class as choices
 
-    use_dropout: Switch = True           # "switch" argument, enable with "--use-dropout" and disable with "--no-use-dropout"
+    use_dropout: Switch = True  # "switch" argument, enable with "--use-dropout" and disable with "--no-use-dropout"
     dropout_prob: Optional[float] = 0.5  # optional argument, "--dropout-prob=none" parses into `None`
 
 args = Arguments()
@@ -71,7 +71,7 @@ parser.add_argument("--model-name", type=str, required=True)
 parser.add_argument("--hidden-size", type=int, default=512)
 
 parser.add_argument("--activation", choices=["relu", "tanh", "sigmoid"], default="relu")
-parser.add_argument("--logging-level", choices=[str(item) for item in LoggingLevels], default="info")
+parser.add_argument("--logging-level", choices=[item.value for item in LoggingLevels], default="info")
 
 parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
 parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")

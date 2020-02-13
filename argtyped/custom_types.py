@@ -47,7 +47,12 @@ class Enum(enum.Enum):
         return self.value == other or super().__eq__(other)
 
 
-Switch = Union[bool]
+# Switch is a type that's different but equivalent to `bool`.
+# It is defined as the `Union` of `bool` and a dummy type, because:
+# 1. `bool` cannot be sub-typed.
+# 2. `Union` with a single (possibly duplicated) type is flattened into that type.
+_dummy_type = type("--invalid-type--", (), {})
+Switch = Union[bool, _dummy_type]
 
 
 def is_choices(typ: type) -> bool:
