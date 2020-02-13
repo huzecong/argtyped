@@ -1,9 +1,12 @@
 # `argtyped`: Command Line Argument Parser, with Types
 
-![Build Status](https://github.com/huzecong/argtyped/workflows/Build/badge.svg)
+[![Build Status](https://github.com/huzecong/argtyped/workflows/Build/badge.svg)](https://github.com/huzecong/argtyped/actions?query=workflow%3ABuild+branch%3Amaster)
+[![CodeCov](https://codecov.io/gh/huzecong/argtyped/branch/master/graph/badge.svg?token=ELHfYJ2Ydq)](https://codecov.io/gh/huzecong/argtyped)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/huzecong/argtyped/blob/master/LICENSE)
 
-`argtyped` adds type annotations to [`argparse`](https://docs.python.org/3/library/argparse.html), the command line
-argument parser library built into Python. Compared to `argparse`, this library gives you:
+`argtyped` is an command line argument parser with that relies on type annotations. It is built on
+[`argparse`](https://docs.python.org/3/library/argparse.html), the command line argument parser library built into
+Python. Compared with `argparse`, this library gives you:
 
 - More concise and intuitive syntax, less boilerplate code.
 - Type checking and IDE auto-completion for command line arguments.
