@@ -1,5 +1,6 @@
 import argparse
 import functools
+import sys
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from .custom_types import Switch, is_choices, is_optional, unwrap_optional
@@ -12,15 +13,40 @@ T = TypeVar('T')
 ConversionFn = Callable[[str], T]
 
 
-def _add_toggle_argument(parser: argparse.ArgumentParser, name: str, default: bool = False) -> None:
-    r"""Add a "toggle" argument to the parser. A toggle argument with name ``"flag"`` has value ``True`` if the argument
-    ``--flag`` exists, and ``False`` if ``--no-flag`` exists.
+class ArgumentParser(argparse.ArgumentParser):
+    r"""A class to override some of ``ArgumentParser``\ 's behaviors.
     """
-    assert name.startswith("--")
-    name = name[2:]
-    var_name = name.replace('-', '_')
-    parser.add_argument(f"--{name}", action="store_true", default=default, dest=var_name)
-    parser.add_argument(f"--no-{name}", action="store_false", dest=var_name)
+
+    def _get_value(self, action, arg_string):
+        r"""The original ``_get_value`` method catches exceptions in user-defined ``type_func``\ s and ignores the
+        error message. Here we don't do that.
+        """
+        type_func = self._registry_get('type', action.type, action.type)
+
+        try:
+            result = type_func(arg_string)
+        except (argparse.ArgumentTypeError, TypeError, ValueError) as e:
+            message = f"value '{arg_string}', {e.__class__.__name__}: {str(e)}"
+            raise argparse.ArgumentError(action, message)
+
+        return result
+
+    def error(self, message):
+        r"""The original ``error`` method only prints the usage and force quits. Here we print the full help.
+        """
+        self.print_help(sys.stderr)
+        sys.stderr.write(f"{self.prog}: error: {message}\n")
+        self.exit(2)
+
+    def add_switch_argument(self, name: str, default: bool = False) -> None:
+        r"""Add a "switch" argument to the parser. A switch argument with name ``"flag"`` has value ``True`` if the
+        argument ``--flag`` exists, and ``False`` if ``--no-flag`` exists.
+        """
+        assert name.startswith("--")
+        name = name[2:]
+        var_name = name.replace('-', '_')
+        self.add_argument(f"--{name}", action="store_true", default=default, dest=var_name)
+        self.add_argument(f"--no-{name}", action="store_false", dest=var_name)
 
 
 def _bool_conversion_fn(s: str) -> bool:
@@ -32,7 +58,7 @@ def _bool_conversion_fn(s: str) -> bool:
 
 
 def _optional_wrapper_fn(fn: ConversionFn[T]) -> ConversionFn[Optional[T]]:
-    @functools.wraps(fn)  # type: ignore  # this works even if `fn` is None
+    @functools.wraps(fn)
     def wrapped(s: str) -> Optional[T]:
         if s.lower() == 'none':
             return None
@@ -123,8 +149,10 @@ class Arguments:
                 if key not in annotations:
                     raise ValueError(f"Argument '{key}' does not have type annotation")
 
-        parser = argparse.ArgumentParser()
+        parser = ArgumentParser()
         for arg_name, arg_typ in annotations.items():
+            # Check validity of name and type.
+
             has_default = hasattr(self.__class__, arg_name)
             default_val = getattr(self.__class__, arg_name, None)
             nullable = is_optional(arg_typ)
@@ -146,10 +174,10 @@ class Arguments:
             parser_kwargs: Dict[str, Any] = {
                 "required": required,
             }
-            if arg_typ is Switch:
+            if arg_typ is Switch:  # type: ignore
                 if not isinstance(default_val, bool):
                     raise ValueError(f"Switch argument '{arg_name}' must have a default value of type bool")
-                _add_toggle_argument(parser, parser_arg_name, default_val)
+                parser.add_switch_argument(parser_arg_name, default_val)
             elif is_choices(arg_typ):
                 choices = arg_typ.__values__  # type: ignore
                 parser_kwargs["choices"] = choices
@@ -158,6 +186,7 @@ class Arguments:
                         raise ValueError(f"Invalid default value for choice argument '{arg_name}'")
                     parser_kwargs["default"] = default_val
                 parser.add_argument(parser_arg_name, **parser_kwargs)
+                # TODO: Add handling of enums
             else:
                 if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
                     raise ValueError(f"Invalid type '{arg_typ}' for argument '{arg_name}'")

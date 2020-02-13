@@ -52,7 +52,7 @@ class Enum(enum.Enum):
 # 1. `bool` cannot be sub-typed.
 # 2. `Union` with a single (possibly duplicated) type is flattened into that type.
 _dummy_type = type("--invalid-type--", (), {})
-Switch = Union[bool, _dummy_type]
+Switch = Union[bool, _dummy_type]  # type: ignore
 
 
 def is_choices(typ: type) -> bool:
