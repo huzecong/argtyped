@@ -44,10 +44,11 @@ jobs:
         fail_ci_if_error: true
     - name: Build dists
       run: |
+        pip install wheel
         python setup.py sdist
         python setup.py bdist_wheel
     - name: Publish to PyPI
-      if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
+      if: matrix.python-version == 3.6 && github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@master
       with:
         user: __token__
