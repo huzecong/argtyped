@@ -45,7 +45,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
     strategy:
       matrix:
         python-version: [3.7]
@@ -65,8 +65,8 @@ jobs:
         run: |
           pip install --upgrade twine
           TWINE_USERNAME="__token__" \
-          TWINE_PASSWORD="${{ secrets.test_pypi_password }}" \
-            exec twine upload --skip-existing dist/* --repository-url https://test.pypi.org/legacy/
+          TWINE_PASSWORD="${{ secrets.pypi_password }}" \
+            exec twine upload --skip-existing dist/*
 
   test-deploy:
     runs-on: ubuntu-latest
@@ -85,7 +85,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install PyPI package
         run: |
-          pip install --index-url https://test.pypi.org/simple/ argtyped
+          pip install argtyped
       - name: Unit test with PyPI package
         run: |
           pip install pytest
