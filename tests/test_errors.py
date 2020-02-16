@@ -38,14 +38,18 @@ def test_switch_not_bool():
 
 def test_invalid_choice():
     with pytest.raises(TypeError, match=r"must contain at least one"):
-        class _Args(Arguments):
+        class Args1(Arguments):
             a: Choices[()]
 
-    class Args(Arguments):
-        a: Choices['a'] = "b"  # wrong
+    with pytest.raises(ValueError, match=r"Invalid default value"):
+        class Args2(Arguments):
+            a: Choices['a'] = "b"  # wrong
 
-    with pytest.raises(ValueError, match=r"Invalid default value for choice"):
-        _ = Args()
+        _ = Args2()
+
+    with pytest.raises(TypeError, match=r"contain a non-str value"):
+        class Args3(Arguments):
+            a: Choices[1, 2]
 
 
 def test_invalid_bool(capsys):
@@ -72,4 +76,15 @@ def test_invalid_type():
         class Args(Arguments):
             b: "str" = 1
 
+        _ = Args()
+
+def test_invalid_enum():
+    class MyEnum(Enum):
+        a = auto()
+        b = auto()
+
+    class Args(Arguments):
+        enum: MyEnum = "c"
+
+    with pytest.raises(ValueError, match="Invalid default value"):
         _ = Args()

@@ -7,6 +7,7 @@ __all__ = [
     "auto",  # also export auto for convenience
     "Switch",
     "is_choices",
+    "is_enum",
     "is_optional",
     "unwrap_optional",
 ]
@@ -30,6 +31,9 @@ class _Choices:
             parsed_values = tuple(values)
         else:
             parsed_values = (values,)
+        for value in parsed_values:
+            if not isinstance(value, str):
+                raise TypeError(f"Choices contain a non-str value: '{value}'")
         return self.__class__(parsed_values)
 
 
@@ -60,6 +64,12 @@ def is_choices(typ: type) -> bool:
     since :class:`Choices` is a metaclass.
     """
     return isinstance(typ, _Choices)
+
+
+def is_enum(typ: Any) -> bool:
+    r"""Check whether a type is an Enum type. Since we're using ``issubclass``, we need to check whether :arg:`typ`
+    is a type first."""
+    return isinstance(typ, type) and issubclass(typ, enum.Enum)
 
 
 def is_optional(typ: type) -> bool:

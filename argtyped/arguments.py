@@ -3,7 +3,7 @@ import functools
 import sys
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from .custom_types import Switch, is_choices, is_optional, unwrap_optional
+from .custom_types import Switch, is_choices, is_enum, is_optional, unwrap_optional
 
 __all__ = [
     "Arguments",
@@ -77,13 +77,23 @@ class Arguments:
 
     .. code-block:: python
 
-        from ghcc.utils import Arguments, Choices, Switch
+        from typing import Optional
+
+        from argtyped import Arguments, Choices, Switch
+        from argtyped import Enum, auto
+
+        class LoggingLevels(Enum):
+            Debug = auto()
+            Info = auto()
+            Warning = auto()
+            Error = auto()
+            Critical = auto()
 
         class MyArguments(Arguments):
             model_name: str
             hidden_size: int = 512
             activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'
-            logging_level: Choices[ghcc.logging.get_levels()] = 'info'
+            logging_level: LoggingLevels = LoggingLevels.Info
             use_dropout: Switch = True
             dropout_prob: Optional[float] = 0.5
 
@@ -178,15 +188,18 @@ class Arguments:
                 if not isinstance(default_val, bool):
                     raise ValueError(f"Switch argument '{arg_name}' must have a default value of type bool")
                 parser.add_switch_argument(parser_arg_name, default_val)
-            elif is_choices(arg_typ):
-                choices = arg_typ.__values__  # type: ignore
+            elif is_choices(arg_typ) or is_enum(arg_typ):
+                if is_enum(arg_typ):
+                    choices = list(arg_typ)
+                    parser_kwargs["type"] = arg_typ
+                else:
+                    choices = arg_typ.__values__  # type: ignore
                 parser_kwargs["choices"] = choices
                 if has_default:
                     if default_val not in choices:
-                        raise ValueError(f"Invalid default value for choice argument '{arg_name}'")
+                        raise ValueError(f"Invalid default value for argument '{arg_name}'")
                     parser_kwargs["default"] = default_val
                 parser.add_argument(parser_arg_name, **parser_kwargs)
-                # TODO: Add handling of enums
             else:
                 if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
                     raise ValueError(f"Invalid type '{arg_typ}' for argument '{arg_name}'")
