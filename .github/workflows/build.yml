@@ -43,13 +43,15 @@ jobs:
         yml: ./codecov.yml
         fail_ci_if_error: true
     - name: Build dists
+      if: matrix.python-version == 3.6
       run: |
         pip install wheel
         python setup.py sdist
         python setup.py bdist_wheel
     - name: Publish to PyPI
-      if: matrix.python-version == 3.6 && github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
-      uses: pypa/gh-action-pypi-publish@master
-      with:
-        user: __token__
-        password: ${{ secrets.pypi_password }}
+      if: matrix.python-version == 3.6 && github.event_name == 'push'
+      run: |
+        pip install --upgrade twine
+        TWINE_USERNAME="__token__" \
+        TWINE_PASSWORD="${{ secrets.test_pypi_password }}" \
+          exec twine upload dist/* --repository-url https://test.pypi.org/legacy/
