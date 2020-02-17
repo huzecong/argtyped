@@ -23,7 +23,7 @@ pip install argtyped
 
 Or, install the latest commit from GitHub:
 ```bash
-pip install -e git+https://github.com/huzecong/argtyped.git
+pip install git+https://github.com/huzecong/argtyped.git
 ```
 
 ## Usage
