@@ -1,5 +1,5 @@
 import enum
-from typing import Any, Iterable, Union, TypeVar, Optional, Type
+from typing import Any, Iterable, Optional, Type, TypeVar, Union
 
 __all__ = [
     "Choices",

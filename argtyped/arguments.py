@@ -67,7 +67,7 @@ def _optional_wrapper_fn(fn: ConversionFn[T]) -> ConversionFn[Optional[T]]:
     return wrapped
 
 
-_TYPE_CONVERSION_FN: Dict[type, Callable[[str], Any]] = {
+_TYPE_CONVERSION_FN: Dict[type, ConversionFn[Any]] = {
     bool: _bool_conversion_fn,
 }
 
@@ -190,7 +190,7 @@ class Arguments:
                 parser.add_switch_argument(parser_arg_name, default_val)
             elif is_choices(arg_typ) or is_enum(arg_typ):
                 if is_enum(arg_typ):
-                    choices = list(arg_typ)
+                    choices = list(arg_typ)  # type: ignore
                     parser_kwargs["type"] = arg_typ
                 else:
                     choices = arg_typ.__values__  # type: ignore

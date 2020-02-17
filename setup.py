@@ -18,6 +18,11 @@ setuptools.setup(
     license="MIT License",
 
     packages=setuptools.find_packages(),
+    package_data={
+        "argtyped": [
+            "py.typed",  # indicating type-checked package
+        ],
+    },
     platforms='any',
 
     install_requires=[],

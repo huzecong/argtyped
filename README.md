@@ -197,7 +197,7 @@ To summarize, whatever works for `argparse` works here. The following types are 
   from typing import Optional
 
   class MyArgs(Arguments):
-      opt_arg: Optional[int]
+      opt_arg: Optional[int]  # implicitly defaults to `None`
 
   # argv: []                 => opt_arg=None
   # argv: ["--opt-arg=1"]    => opt_arg=1
@@ -213,6 +213,7 @@ To summarize, whatever works for `argparse` works here. The following types are 
 - Using switch arguments may result in name clashes: if a switch argument has name `arg`, there can be no argument with
   the name `no_arg`.
 - `Optional` cannot be used with `Choices`. You can add `"none"` as a valid choice to mimic a similar behavior.
+- `Optional[str]` would parse a value of `"none"` into `None`.
 
 ## Under the Hood
 
