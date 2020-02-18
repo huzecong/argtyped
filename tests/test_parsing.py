@@ -4,9 +4,8 @@ from typing import Optional
 
 import pytest
 
-from argtyped.arguments import _TYPE_CONVERSION_FN
-
 from argtyped import *
+from argtyped.arguments import _TYPE_CONVERSION_FN
 
 
 class MyLoggingLevels(Enum):
@@ -80,6 +79,8 @@ def test_parse():
     assert isinstance(args, MyArguments)
     for key in result:
         assert result[key] == getattr(args, key)
+
+    assert args.to_dict() == result
 
 
 def test_print():

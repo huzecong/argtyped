@@ -1,7 +1,8 @@
 import argparse
 import functools
 import sys
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from collections import OrderedDict
+from typing import Any, Callable, Dict, List, Optional, OrderedDict as OrderedDictT, TypeVar
 
 from .custom_types import Switch, is_choices, is_enum, is_optional, unwrap_optional
 
@@ -143,10 +144,10 @@ class Arguments:
     **Note:** Advanced features such as subparsers, groups, argument lists, custom actions are not supported.
     """
 
-    _annotations: Dict[str, type]
+    _annotations: OrderedDictT[str, type]
 
     def __init__(self, args: Optional[List[str]] = None):
-        annotations: Dict[str, type] = {}
+        annotations: OrderedDictT[str, type] = OrderedDict()
         for base in reversed(self.__class__.mro()):
             # Use reversed order so derived classes can override base annotations.
             if base not in [object, Arguments]:
@@ -220,6 +221,13 @@ class Arguments:
         self._annotations = annotations
         for arg_name, arg_typ in annotations.items():
             setattr(self, arg_name, getattr(namespace, arg_name))
+
+    def to_dict(self) -> OrderedDictT[str, Any]:
+        r"""Convert the set of arguments to a dictionary.
+
+        :return: An ``OrderedDict`` mapping argument names to values.
+        """
+        return OrderedDict([(key, getattr(self, key)) for key in self._annotations.keys()])
 
     def to_string(self, width: Optional[int] = None, max_width: Optional[int] = None) -> str:
         r"""Represent the arguments as a table.

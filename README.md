@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/huzecong/argtyped/workflows/Build/badge.svg)](https://github.com/huzecong/argtyped/actions?query=workflow%3ABuild+branch%3Amaster)
 [![CodeCov](https://codecov.io/gh/huzecong/argtyped/branch/master/graph/badge.svg?token=ELHfYJ2Ydq)](https://codecov.io/gh/huzecong/argtyped)
-[![PyPI](https://badge.fury.io/py/argtyped.svg)](https://pypi.org/project/argtyped/)
+[![PyPI](https://img.shields.io/pypi/v/argtyped.svg)](https://pypi.org/project/argtyped/)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/huzecong/argtyped/blob/master/LICENSE)
 
 `argtyped` is an command line argument parser with that relies on type annotations. It is built on
@@ -141,6 +141,18 @@ args = MyArgs()                    # equivalent to `parser.parse_args()`
 args = MyArgs(["--value", "123"])  # equivalent to `parser.parse_args(["--value", "123"])
 assert isinstance(args, MyArgs)
 ```
+
+#### `Arguments.to_dict(self)`
+
+Convert the set of arguments to a dictionary (`OrderedDict`).
+
+#### `Arguments.to_string(self, width: Optional[int] = None, max_width: Optional[int] = None)`
+
+Represent the arguments as a table.
+- `width`: Width of the printed table. Defaults to `None`, which fits the table to its contents. An exception is raised
+  when the table cannot be drawn with the given width.
+- `max_width`: Maximum width of the printed table. Defaults to `None`, meaning no limits. Must be `None` if `width` is
+  not `None`.
 
 ### Argument Types
 
