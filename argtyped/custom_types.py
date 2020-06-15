@@ -56,6 +56,7 @@ _dummy_type = type("--invalid-type--", (), {})
 Switch = Union[bool, _dummy_type]  # type: ignore[valid-type]
 
 HAS_LITERAL = False
+_Literal = None
 try:
     from typing import Literal  # type: ignore
 
@@ -63,6 +64,11 @@ try:
 except ImportError:
     try:
         from typing_extensions import Literal  # type: ignore
+
+        try:
+            from typing_extensions import _Literal  # type: ignore  # compat. with Python 3.6
+        except ImportError:
+            pass
 
         HAS_LITERAL = True
     except ImportError:
@@ -73,12 +79,16 @@ if HAS_LITERAL:
         r"""Check whether a type is a choices type (:class:`Choices` or :class:`Literal`). This cannot be checked using
         traditional methods,  since :class:`Choices` is a metaclass.
         """
-        return isinstance(typ, _Choices) or getattr(typ, '__origin__', None) is Literal
+        return (isinstance(typ, _Choices) or
+                getattr(typ, '__origin__', None) is Literal or
+                type(typ) is _Literal)  # pylint: disable=unidiomatic-typecheck
 
 
     def unwrap_choices(typ: type) -> Tuple[str, ...]:
-        r"""Return the string literals associated with the choices type."""
-        return typ.__values__ if isinstance(typ, _Choices) else typ.__args__  # type: ignore[attr-defined]
+        r"""Return the string literals associated with the choices type. Literal type in Python 3.7+ stores the literals
+        in ``typ.__args__``, but in Python 3.6- it's in ``typ.__values__``.
+        """
+        return typ.__values__ if hasattr(typ, "__values__") else typ.__args__  # type: ignore[attr-defined]
 
 else:
     def is_choices(typ: type) -> bool:
