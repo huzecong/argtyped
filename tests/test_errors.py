@@ -2,6 +2,7 @@ import re
 from typing import Optional
 
 import pytest
+from typing_extensions import Literal
 
 from argtyped import *
 
@@ -47,9 +48,17 @@ def test_invalid_choice():
 
         _ = Args2()
 
-    with pytest.raises(TypeError, match=r"contain a non-str value"):
+    with pytest.raises(ValueError, match=r"must be string"):
         class Args3(Arguments):
-            a: Choices[1, 2]
+            a: Choices['1', 2]
+
+        _ = Args3()
+
+    with pytest.raises(ValueError, match=r"must be string"):
+        class Args4(Arguments):
+            a: Literal['1', 2]
+
+        _ = Args4()
 
 
 def test_invalid_bool(capsys):
@@ -77,6 +86,7 @@ def test_invalid_type():
             b: "str" = 1
 
         _ = Args()
+
 
 def test_invalid_enum():
     class MyEnum(Enum):

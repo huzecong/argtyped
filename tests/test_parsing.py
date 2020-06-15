@@ -3,6 +3,7 @@ import enum
 from typing import Optional
 
 import pytest
+from typing_extensions import Literal
 
 from argtyped import *
 from argtyped.arguments import _TYPE_CONVERSION_FN
@@ -33,6 +34,7 @@ class MyArguments(Arguments):
     model_name: str
     hidden_size: int = 512
     activation: Choices['relu', 'tanh', 'sigmoid'] = "relu"
+    activation2: Literal['relu', 'tanh', 'sigmoid'] = "tanh"
     logging_level: MyLoggingLevels = MyLoggingLevels.Info
     use_dropout: Switch = True
     dropout_prob: Optional[float] = 0.5
@@ -44,6 +46,7 @@ class MyArguments(Arguments):
 CMD = r"""
     --model-name LSTM
     --activation sigmoid
+    --activation2=sigmoid
     --logging-level=debug
     --no-use-dropout
     --dropout-prob none
@@ -58,6 +61,7 @@ def test_parse():
     parser.add_argument("--model-name", type=str, required=True)
     parser.add_argument("--hidden-size", type=int, default=512)
     parser.add_argument("--activation", choices=["relu", "tanh", "sigmoid"], default="relu")
+    parser.add_argument("--activation2", choices=["relu", "tanh", "sigmoid"], default="tanh")
     parser.add_argument("--logging-level", choices=list(LoggingLevels), type=LoggingLevels, default="info")
     parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
     parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")
@@ -67,7 +71,8 @@ def test_parse():
     parser.add_argument("--some-false-arg", type=_TYPE_CONVERSION_FN[bool], required=True)
 
     result = dict(
-        model_name="LSTM", hidden_size=512, activation="sigmoid", logging_level=MyLoggingLevels.Debug,
+        model_name="LSTM", hidden_size=512, activation="sigmoid", activation2="sigmoid",
+        logging_level=MyLoggingLevels.Debug,
         use_dropout=False, dropout_prob=None, label_smoothing=0.1,
         some_true_arg=True, some_false_arg=False)
 

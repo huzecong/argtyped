@@ -4,7 +4,7 @@ import sys
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from .custom_types import Switch, is_choices, is_enum, is_optional, unwrap_optional
+from .custom_types import Switch, is_choices, is_enum, is_optional, unwrap_optional, unwrap_choices
 
 __all__ = [
     "Arguments",
@@ -185,16 +185,19 @@ class Arguments:
             parser_kwargs: Dict[str, Any] = {
                 "required": required,
             }
-            if arg_typ is Switch:  # type: ignore
+            if arg_typ is Switch:  # type: ignore[misc]
                 if not isinstance(default_val, bool):
                     raise ValueError(f"Switch argument '{arg_name}' must have a default value of type bool")
                 parser.add_switch_argument(parser_arg_name, default_val)
             elif is_choices(arg_typ) or is_enum(arg_typ):
                 if is_enum(arg_typ):
-                    choices = list(arg_typ)  # type: ignore
+                    choices = list(arg_typ)  # type: ignore[call-overload]
                     parser_kwargs["type"] = arg_typ
                 else:
-                    choices = arg_typ.__values__  # type: ignore
+                    choices = unwrap_choices(arg_typ)
+                    if any(not isinstance(choice, str) for choice in choices):
+                        raise ValueError("All choices must be strings")
+
                 parser_kwargs["choices"] = choices
                 if has_default:
                     if default_val not in choices:

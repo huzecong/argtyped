@@ -1,5 +1,5 @@
 import enum
-from typing import Any, Iterable, Optional, Type, TypeVar, Union
+from typing import Any, Iterable, Optional, Tuple, Type, TypeVar, Union
 
 __all__ = [
     "Choices",
@@ -25,15 +25,12 @@ class _Choices:
         return self
 
     def __getitem__(self, values: Union[str, Iterable[str]]):
-        if values == ():
-            raise TypeError("Choices must contain at least one element")
         if isinstance(values, Iterable) and not isinstance(values, str):
             parsed_values = tuple(values)
         else:
             parsed_values = (values,)
-        for value in parsed_values:
-            if not isinstance(value, str):
-                raise TypeError(f"Choices contain a non-str value: '{value}'")
+        if len(parsed_values) == 0:
+            raise TypeError("Choices must contain at least one element")
         return self.__class__(parsed_values)
 
 
@@ -56,14 +53,44 @@ class Enum(enum.Enum):
 # 1. `bool` cannot be sub-typed.
 # 2. `Union` with a single (possibly duplicated) type is flattened into that type.
 _dummy_type = type("--invalid-type--", (), {})
-Switch = Union[bool, _dummy_type]  # type: ignore
+Switch = Union[bool, _dummy_type]  # type: ignore[valid-type]
+
+HAS_LITERAL = False
+try:
+    from typing import Literal  # type: ignore[attr-defined]
+
+    HAS_LITERAL = True
+except ImportError:
+    try:
+        from typing_extensions import Literal
+
+        HAS_LITERAL = True
+    except ImportError:
+        pass
+
+if HAS_LITERAL:
+    def is_choices(typ: type) -> bool:
+        r"""Check whether a type is a choices type (:class:`Choices` or :class:`Literal`). This cannot be checked using
+        traditional methods,  since :class:`Choices` is a metaclass.
+        """
+        return isinstance(typ, _Choices) or getattr(typ, '__origin__', None) is Literal
 
 
-def is_choices(typ: type) -> bool:
-    r"""Check whether a type is a choices type. This cannot be checked using traditional methods,
-    since :class:`Choices` is a metaclass.
-    """
-    return isinstance(typ, _Choices)
+    def unwrap_choices(typ: type) -> Tuple[str, ...]:
+        r"""Return the string literals associated with the choices type."""
+        return typ.__values__ if isinstance(typ, _Choices) else typ.__args__  # type: ignore[attr-defined]
+
+else:
+    def is_choices(typ: type) -> bool:
+        r"""Check whether a type is a choices type (:class:`Choices`). This cannot be checked using traditional methods,
+        since :class:`Choices` is a metaclass.
+        """
+        return isinstance(typ, _Choices)
+
+
+    def unwrap_choices(typ: type) -> Tuple[str, ...]:
+        r"""Return the string literals associated with the choices type."""
+        return typ.__values__  # type: ignore[attr-defined]
 
 
 def is_enum(typ: Any) -> bool:

@@ -33,8 +33,9 @@ With `argtyped`, you can define command line arguments in a syntax similar to
 be illustrated with an example:
 ```python
 from typing import Optional
+from typing_extensions import Literal
 
-from argtyped import Arguments, Choices, Switch
+from argtyped import Arguments, Switch
 from argtyped import Enum, auto
 
 class LoggingLevels(Enum):
@@ -48,7 +49,7 @@ class MyArguments(Arguments):
     model_name: str         # required argument of `str` type
     hidden_size: int = 512  # `int` argument with default value of 512
 
-    activation: Choices['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
+    activation: Literal['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
     logging_level: LoggingLevels = LoggingLevels.Info        # using `Enum` class as choices
 
     use_dropout: Switch = True  # switch argument, enable with "--use-dropout" and disable with "--no-use-dropout"
@@ -161,22 +162,28 @@ To summarize, whatever works for `argparse` works here. The following types are 
 - Built-in types such as `int`, `float`, `str`.
 - `bool` type. Accepted values (case-insensitive) for `True` are: `y`, `yes`, `true`, `ok`; accepted values for `False`
   are: `n`, `no`, `false`.
-- Choice types `Choices[...]`. A choice argument is essentially an `str` argument with limited choice of values. The
-  ellipses can be filled with a tuple of `str`s, or an expression that evaluates to a list of `str`s:
+- Choice types `Literal[...]` or `Choices[...]`. A choice argument is essentially an `str` argument with limited choice
+  of values. The ellipses can be filled with a tuple of `str`s, or an expression that evaluates to a list of `str`s:
   ```python
   from argtyped import Arguments, Choices
   from typing import List
+  from typing_extensions import Literal
 
   def logging_levels() -> List[str]:
       return ["debug", "info", "warning", "error"]
 
   class MyArgs(Arguments):
-      foo: Choices["debug", "info", "warning", "error"]  # 4 choices
+      foo: Literal["debug", "info", "warning", "error"]  # 4 choices
       bar: Choices[logging_levels()]                     # the same 4 choices
 
   # argv: ["--foo=debug", "--bar=info"] => foo="debug", bar="info"
   ```
   This is equivalent to the `choices` keyword in `argparse.add_argument`.
+  
+  **Note:** The choice type was previously named `Choices`. This is deprecated in favor of the
+  [`Literal` type](https://mypy.readthedocs.io/en/stable/literal_types.html) introduced in Python 3.8 and back-ported to
+  3.6 and 3.7 in the `typing_extensions` library. Please see [Caveats](#caveats) for a discussing on the differences
+  between the two.
 - Enum types derived from `enum.Enum`. It is recommended to use `argtyped.Enum` which uses the instance names as values:
   ```python
   from argtyped import Enum
@@ -226,6 +233,18 @@ To summarize, whatever works for `argparse` works here. The following types are 
   the name `no_arg`.
 - `Optional` cannot be used with `Choices`. You can add `"none"` as a valid choice to mimic a similar behavior.
 - `Optional[str]` would parse a value of `"none"` into `None`.
+- `Choices` vs `Literal`:
+    - When all choices are defined as string literals, the two types are interchangeable.
+    - Pros for `Choices`:
+        - The `Choices` parameter can be an expression that evaluate to an iterable of strings, while `Literal` only
+          supports string literals as parameters.
+        - `Literal` requires installing the `typing_extensions` package in Python versions prior to 3.8. This package is
+          not listed as a prerequisite of `argtyped` so you must manually install it.
+    - Pros for `Literal`:
+        - `Literal` is a built-in type supported by type-checkers and IDEs. You can get better type inference with
+          `Literal`, and the IDE won't warn you that your choices are "undefined" (because it interprets the string
+          literals as forward references).
+        - `Literal` can be combined with `Optional`.
 
 ## Under the Hood
 
