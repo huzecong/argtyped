@@ -73,10 +73,10 @@ def is_enum(typ: Any) -> bool:
 
 
 def is_optional(typ: type) -> bool:
-    r"""Check whether a type is `Optional`. `Optional` is internally implemented as `Union` with `type(None)`."""
+    r"""Check whether a type is `Optional[T]`. `Optional` is internally implemented as `Union` with `type(None)`."""
     return getattr(typ, '__origin__', None) is Union and NoneType in typ.__args__  # type: ignore
 
 
 def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:
-    r"""Return the inner type inside an `Optional` type."""
+    r"""Return the inner type inside an `Optional[T]` type."""
     return next(t for t in typ.__args__ if not isinstance(t, NoneType))  # type: ignore

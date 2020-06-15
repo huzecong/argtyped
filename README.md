@@ -195,8 +195,8 @@ To summarize, whatever works for `argparse` works here. The following types are 
       switch: Switch = True
       bool_arg: bool = False
 
-  # argv: []                                 => flag=True, bool_arg=False
-  # argv: ["--switch", "--bool-arg=false"]   => flag=True, bool_arg=False
+  # argv: []                                 => flag=True,  bool_arg=False
+  # argv: ["--switch", "--bool-arg=false"]   => flag=True,  bool_arg=False
   # argv: ["--no-switch", "--bool-arg=true"] => flag=False, bool_arg=True
   # argv: ["--switch=false"]                 => WRONG
   # argv: ["--no-bool-arg"]                  => WRONG
@@ -237,3 +237,11 @@ This is what happens under the hood:
 3. The parser's `parse_args` method is invoked with either `sys.argv` or strings provided as parameters, returning
    parsed arguments.
 4. The parsed arguments are assigned to `self` (the instance of `Arguments` subclass being initialized).
+
+## Todo
+
+- [ ] Support `List[Choices[...]]` and `Optional[Choices[...]]`.
+- [ ] Support `action="append"` or `action="extend"` for `List[T]` types.
+    - Technically this is not a problem, but there's no elegant way to configure whether this behavior is desired.
+- [ ] Move parser construction to subclass initialization phase. This should allow us to detect error earlier.
+- [ ] Add type validity checks before parsing. Also throw (suppressable) warnings on using non-type callables as types.
