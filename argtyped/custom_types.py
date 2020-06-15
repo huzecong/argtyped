@@ -57,12 +57,12 @@ Switch = Union[bool, _dummy_type]  # type: ignore[valid-type]
 
 HAS_LITERAL = False
 try:
-    from typing import Literal  # type: ignore[attr-defined]
+    from typing import Literal  # type: ignore
 
     HAS_LITERAL = True
 except ImportError:
     try:
-        from typing_extensions import Literal
+        from typing_extensions import Literal  # type: ignore
 
         HAS_LITERAL = True
     except ImportError:
