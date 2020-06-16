@@ -51,9 +51,13 @@ class Enum(enum.Enum):
 # Switch is a type that's different but equivalent to `bool`.
 # It is defined as the `Union` of `bool` and a dummy type, because:
 # 1. `bool` cannot be sub-typed.
+#    >> Switch = type('Switch', (bool,), {})
 # 2. `Union` with a single (possibly duplicated) type is flattened into that type.
-_dummy_type = type("--invalid-type--", (), {})
-Switch = Union[bool, _dummy_type]  # type: ignore[valid-type]
+#    >> Switch = Union[bool]
+# 3. `NewType` forbids implicit casts from `bool`.
+#    >> Switch = NewType('Switch', bool)
+__dummy_type__ = type("__dummy_type__", (), {})  # the names must match for pickle to work
+Switch = Union[bool, __dummy_type__]  # type: ignore[valid-type]
 
 HAS_LITERAL = False
 _Literal = None
