@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Literal types: `Literal`. They act mostly the same as `Choices`.
 
+### Changed
+- `Arguments` is now pickle-able.
+
 ## [0.1] - 2020-02-16
 ### Added
 - The base of everything: the `Argument` class.
