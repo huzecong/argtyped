@@ -55,7 +55,7 @@ class MyArguments(Arguments):
     use_dropout: Switch = True  # switch argument, enable with "--use-dropout" and disable with "--no-use-dropout"
     dropout_prob: Optional[float] = 0.5  # optional argument, "--dropout-prob=none" parses into `None`
 
-args = Arguments()
+args = MyArguments()
 ```
 
 This is equivalent to the following code with Python built-in `argparse`:
