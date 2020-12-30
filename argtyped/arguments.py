@@ -4,25 +4,32 @@ import sys
 from collections import OrderedDict
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
-from .custom_types import Switch, is_choices, is_enum, is_optional, unwrap_optional, unwrap_choices
+from .custom_types import (
+    Switch,
+    is_choices,
+    is_enum,
+    is_optional,
+    unwrap_optional,
+    unwrap_choices,
+)
 
 __all__ = [
     "Arguments",
 ]
 
-T = TypeVar('T')
+T = TypeVar("T")
 ConversionFn = Callable[[str], T]
 
 
 class ArgumentParser(argparse.ArgumentParser):
-    r"""A class to override some of ``ArgumentParser``\ 's behaviors.
-    """
+    r""" A class to override some of ``ArgumentParser``\ 's behaviors. """
 
     def _get_value(self, action, arg_string):
-        r"""The original ``_get_value`` method catches exceptions in user-defined ``type_func``\ s and ignores the
-        error message. Here we don't do that.
+        r"""
+        The original ``_get_value`` method catches exceptions in user-defined
+        ``type_func``\ s and ignores the error message. Here we don't do that.
         """
-        type_func = self._registry_get('type', action.type, action.type)
+        type_func = self._registry_get("type", action.type, action.type)
 
         try:
             result = type_func(arg_string)
@@ -33,20 +40,26 @@ class ArgumentParser(argparse.ArgumentParser):
         return result
 
     def error(self, message):
-        r"""The original ``error`` method only prints the usage and force quits. Here we print the full help.
+        r"""
+        The original ``error`` method only prints the usage and force quits. Here we
+        print the full help.
         """
         self.print_help(sys.stderr)
         sys.stderr.write(f"{self.prog}: error: {message}\n")
         self.exit(2)
 
     def add_switch_argument(self, name: str, default: bool = False) -> None:
-        r"""Add a "switch" argument to the parser. A switch argument with name ``"flag"`` has value ``True`` if the
-        argument ``--flag`` exists, and ``False`` if ``--no-flag`` exists.
+        r"""
+        Add a "switch" argument to the parser. A switch argument with name ``"flag"``
+        has value ``True`` if the argument ``--flag`` exists, and ``False`` if
+        ``--no-flag`` exists.
         """
         assert name.startswith("--")
         name = name[2:]
-        var_name = name.replace('-', '_')
-        self.add_argument(f"--{name}", action="store_true", default=default, dest=var_name)
+        var_name = name.replace("-", "_")
+        self.add_argument(
+            f"--{name}", action="store_true", default=default, dest=var_name
+        )
         self.add_argument(f"--no-{name}", action="store_false", dest=var_name)
 
 
@@ -61,7 +74,7 @@ def _bool_conversion_fn(s: str) -> bool:
 def _optional_wrapper_fn(fn: ConversionFn[T]) -> ConversionFn[Optional[T]]:
     @functools.wraps(fn)
     def wrapped(s: str) -> Optional[T]:
-        if s.lower() == 'none':
+        if s.lower() == "none":
             return None
         return fn(s)
 
@@ -109,11 +122,23 @@ class Arguments:
         parser = argparse.ArgumentParser()
         parser.add_argument("--model-name", type=str, required=True)
         parser.add_argument("--hidden-size", type=int, default=512)
-        parser.add_argument("--activation", choices=["relu", "tanh", "sigmoid"], default="relu")
-        parser.add_argument("--logging-level", choices=ghcc.logging.get_levels(), default="info")
-        parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
-        parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")
-        parser.add_argument("--dropout-prob", type=lambda s: None if s.lower() == 'none' else float(s), default=0.5)
+        parser.add_argument(
+            "--activation", choices=["relu", "tanh", "sigmoid"], default="relu"
+        )
+        parser.add_argument(
+            "--logging-level", choices=ghcc.logging.get_levels(), default="info"
+        )
+        parser.add_argument(
+            "--use-dropout", action="store_true", dest="use_dropout", default=True
+        )
+        parser.add_argument(
+            "--no-use-dropout", action="store_false", dest="use_dropout"
+        )
+        parser.add_argument(
+            "--dropout-prob",
+            type=lambda s: None if s.lower() == 'none' else float(s),
+            default=0.5
+        )
 
         args = parser.parse_args()
 
@@ -132,26 +157,28 @@ class Arguments:
 
     .. code-block:: bash
 
-        Namespace(model_name="LSTM", hidden_size=512, activation="sigmoid", logging_level="debug",
-                  use_dropout=False, dropout_prob=None)
+        Namespace(model_name="LSTM", hidden_size=512, activation="sigmoid",
+                  logging_level="debug", use_dropout=False, dropout_prob=None)
 
     :class:`Arguments` provides the following features:
 
     - More concise and intuitive syntax over ``argparse``, less boilerplate code.
-    - Arguments take the form of type-annotated class attributes, allowing IDEs to provide autocompletion.
+    - Arguments take the form of type-annotated class attributes, allowing IDEs to
+      provide autocompletion.
     - Drop-in replacement for ``argparse``, since internally ``argparse`` is used.
 
-    **Note:** Advanced features such as subparsers, groups, argument lists, custom actions are not supported.
+    **Note:** Advanced features such as subparsers, groups, argument lists, custom
+    actions are not supported.
     """
 
-    _annotations: 'OrderedDict[str, type]'
+    _annotations: "OrderedDict[str, type]"
 
     def __init__(self, args: Optional[List[str]] = None):
-        annotations: 'OrderedDict[str, type]' = OrderedDict()
+        annotations: "OrderedDict[str, type]" = OrderedDict()
         for base in reversed(self.__class__.mro()):
             # Use reversed order so derived classes can override base annotations.
             if base not in [object, Arguments]:
-                annotations.update(base.__dict__.get('__annotations__', {}))
+                annotations.update(base.__dict__.get("__annotations__", {}))
 
         # Check if there are arguments with default values but without annotations.
         for key in dir(self):
@@ -179,7 +206,10 @@ class Arguments:
                 required = True
 
             if not nullable and has_default and default_val is None:
-                raise ValueError(f"Argument '{arg_name}' has default value of None, but is not nullable")
+                raise ValueError(
+                    f"Argument '{arg_name}' has default value of None, but is not "
+                    f"nullable"
+                )
 
             parser_arg_name = "--" + arg_name.replace("_", "-")
             parser_kwargs: Dict[str, Any] = {
@@ -187,7 +217,10 @@ class Arguments:
             }
             if arg_typ is Switch:  # type: ignore[misc]
                 if not isinstance(default_val, bool):
-                    raise ValueError(f"Switch argument '{arg_name}' must have a default value of type bool")
+                    raise ValueError(
+                        f"Switch argument '{arg_name}' must have a default value of "
+                        f"type bool"
+                    )
                 parser.add_switch_argument(parser_arg_name, default_val)
             elif is_choices(arg_typ) or is_enum(arg_typ):
                 if is_enum(arg_typ):
@@ -201,12 +234,16 @@ class Arguments:
                 parser_kwargs["choices"] = choices
                 if has_default:
                     if default_val not in choices:
-                        raise ValueError(f"Invalid default value for argument '{arg_name}'")
+                        raise ValueError(
+                            f"Invalid default value for argument '{arg_name}'"
+                        )
                     parser_kwargs["default"] = default_val
                 parser.add_argument(parser_arg_name, **parser_kwargs)
             else:
                 if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
-                    raise ValueError(f"Invalid type '{arg_typ}' for argument '{arg_name}'")
+                    raise ValueError(
+                        f"Invalid type '{arg_typ}' for argument '{arg_name}'"
+                    )
                 conversion_fn = _TYPE_CONVERSION_FN.get(arg_typ, arg_typ)
                 if nullable:
                     conversion_fn = _optional_wrapper_fn(conversion_fn)
@@ -216,29 +253,38 @@ class Arguments:
                 parser.add_argument(parser_arg_name, **parser_kwargs)
 
         if self.__class__.__module__ != "__main__":
-            # Usually arguments are defined in the same script that is directly run (__main__).
-            # If this is not the case, add a note in help message indicating where the arguments are defined.
-            parser.epilog = f"Note: Arguments defined in {self.__class__.__module__}.{self.__class__.__name__}"
+            # Usually arguments are defined in the same script that is directly
+            # run (__main__). If this is not the case, add a note in help message
+            # indicating where the arguments are defined.
+            parser.epilog = (
+                f"Note: Arguments defined in "
+                f"{self.__class__.__module__}.{self.__class__.__name__}"
+            )
 
         namespace = parser.parse_args(args)
         self._annotations = annotations
         for arg_name, arg_typ in annotations.items():
             setattr(self, arg_name, getattr(namespace, arg_name))
 
-    def to_dict(self) -> 'OrderedDict[str, Any]':
+    def to_dict(self) -> "OrderedDict[str, Any]":
         r"""Convert the set of arguments to a dictionary.
 
         :return: An ``OrderedDict`` mapping argument names to values.
         """
-        return OrderedDict([(key, getattr(self, key)) for key in self._annotations.keys()])
+        return OrderedDict(
+            [(key, getattr(self, key)) for key in self._annotations.keys()]
+        )
 
-    def to_string(self, width: Optional[int] = None, max_width: Optional[int] = None) -> str:
+    def to_string(
+        self, width: Optional[int] = None, max_width: Optional[int] = None
+    ) -> str:
         r"""Represent the arguments as a table.
 
-        :param width: Width of the printed table. Defaults to ``None``, which fits the table to its contents. An
-            exception is raised when the table cannot be drawn with the given width.
-        :param max_width: Maximum width of the printed table. Defaults to ``None``, meaning no limits. Must be ``None``
-            if :arg:`width` is not ``None``.
+        :param width: Width of the printed table. Defaults to ``None``, which fits the
+            table to its contents. An exception is raised when the table cannot be drawn
+            with the given width.
+        :param max_width: Maximum width of the printed table. Defaults to ``None``,
+            meaning no limits. Must be ``None`` if :arg:`width` is not ``None``.
         """
         if width is not None and max_width is not None:
             raise ValueError("`max_width` must be None when `width` is specified")
@@ -259,11 +305,11 @@ class Arguments:
 
         def get_row(k: str, v: str) -> str:
             if len(v) > max_val:
-                v = v[:((max_val - 5) // 2)] + ' ... ' + v[-((max_val - 4) // 2):]
+                v = v[: ((max_val - 5) // 2)] + " ... " + v[-((max_val - 4) // 2) :]
                 assert len(v) == max_val
             return f"║ {k.ljust(max_key)} │ {v.ljust(max_val)} ║\n"
 
-        s = repr(self.__class__) + '\n'
+        s = repr(self.__class__) + "\n"
         s += f"╔═{'═' * max_key}═╤═{'═' * max_val}═╗\n"
         s += get_row(k_col, v_col)
         s += f"╠═{'═' * max_key}═╪═{'═' * max_val}═╣\n"

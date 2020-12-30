@@ -7,24 +7,19 @@ setuptools.setup(
     name="argtyped",
     version="0.2.0.post0",
     url="https://github.com/huzecong/argtyped",
-
     author="Zecong Hu",
     author_email="huzecong@gmail.com",
-
     description="Command line arguments, with types",
     long_description=long_description,
     long_description_content_type="text/markdown",
-
     license="MIT License",
-
     packages=setuptools.find_packages(),
     package_data={
         "argtyped": [
             "py.typed",  # indicating type-checked package
         ],
     },
-    platforms='any',
-
+    platforms="any",
     install_requires=[],
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -40,5 +35,5 @@ setuptools.setup(
         "Topic :: Utilities",
         "Typing :: Typed",
     ],
-    python_requires='>=3.6',
+    python_requires=">=3.6",
 )

@@ -33,8 +33,8 @@ class LoggingLevels(enum.Enum):
 class MyArguments(Arguments):
     model_name: str
     hidden_size: int = 512
-    activation: Choices['relu', 'tanh', 'sigmoid'] = "relu"
-    activation2: Literal['relu', 'tanh', 'sigmoid'] = "tanh"
+    activation: Choices["relu", "tanh", "sigmoid"] = "relu"
+    activation2: Literal["relu", "tanh", "sigmoid"] = "tanh"
     logging_level: MyLoggingLevels = MyLoggingLevels.Info
     use_dropout: Switch = True
     dropout_prob: Optional[float] = 0.5
@@ -55,37 +55,67 @@ CMD = r"""
     --some-false-arg n
     """.split()
 
+RESULT = dict(
+    model_name="LSTM",
+    hidden_size=512,
+    activation="sigmoid",
+    activation2="sigmoid",
+    logging_level=MyLoggingLevels.Debug,
+    use_dropout=False,
+    dropout_prob=None,
+    label_smoothing=0.1,
+    some_true_arg=True,
+    some_false_arg=False,
+)
+
 
 def test_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-name", type=str, required=True)
     parser.add_argument("--hidden-size", type=int, default=512)
-    parser.add_argument("--activation", choices=["relu", "tanh", "sigmoid"], default="relu")
-    parser.add_argument("--activation2", choices=["relu", "tanh", "sigmoid"], default="tanh")
-    parser.add_argument("--logging-level", choices=list(LoggingLevels), type=LoggingLevels, default="info")
-    parser.add_argument("--use-dropout", action="store_true", dest="use_dropout", default=True)
+    parser.add_argument(
+        "--activation", choices=["relu", "tanh", "sigmoid"], default="relu"
+    )
+    parser.add_argument(
+        "--activation2", choices=["relu", "tanh", "sigmoid"], default="tanh"
+    )
+    parser.add_argument(
+        "--logging-level",
+        choices=list(LoggingLevels),
+        type=LoggingLevels,
+        default="info",
+    )
+    parser.add_argument(
+        "--use-dropout", action="store_true", dest="use_dropout", default=True
+    )
     parser.add_argument("--no-use-dropout", action="store_false", dest="use_dropout")
-    parser.add_argument("--dropout-prob", type=lambda s: None if s.lower() == 'none' else float(s), default=0.5)
-    parser.add_argument("--label-smoothing", type=lambda s: None if s.lower() == 'none' else float(s), default=None)
-    parser.add_argument("--some-true-arg", type=_TYPE_CONVERSION_FN[bool], required=True)
-    parser.add_argument("--some-false-arg", type=_TYPE_CONVERSION_FN[bool], required=True)
-
-    result = dict(
-        model_name="LSTM", hidden_size=512, activation="sigmoid", activation2="sigmoid",
-        logging_level=MyLoggingLevels.Debug,
-        use_dropout=False, dropout_prob=None, label_smoothing=0.1,
-        some_true_arg=True, some_false_arg=False)
+    parser.add_argument(
+        "--dropout-prob",
+        type=lambda s: None if s.lower() == "none" else float(s),
+        default=0.5,
+    )
+    parser.add_argument(
+        "--label-smoothing",
+        type=lambda s: None if s.lower() == "none" else float(s),
+        default=None,
+    )
+    parser.add_argument(
+        "--some-true-arg", type=_TYPE_CONVERSION_FN[bool], required=True
+    )
+    parser.add_argument(
+        "--some-false-arg", type=_TYPE_CONVERSION_FN[bool], required=True
+    )
 
     namespace = parser.parse_args(CMD)
     assert isinstance(namespace, argparse.Namespace)
-    for key in result:
-        assert result[key] == getattr(namespace, key)
+    for key in RESULT:
+        assert RESULT[key] == getattr(namespace, key)
     args = MyArguments(CMD)
     assert isinstance(args, MyArguments)
-    for key in result:
-        assert result[key] == getattr(args, key)
+    for key in RESULT:
+        assert RESULT[key] == getattr(args, key)
 
-    assert args.to_dict() == result
+    assert args.to_dict() == RESULT
 
 
 def test_print():

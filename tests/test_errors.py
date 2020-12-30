@@ -33,30 +33,36 @@ def test_switch_not_bool():
         b: Switch  # wrong
         c: Switch = 0  # wrong
 
-    with pytest.raises(ValueError, match=r"Switch argument .* default value of type bool"):
+    with pytest.raises(
+        ValueError, match=r"Switch argument .* default value of type bool"
+    ):
         _ = Args()
 
 
 def test_invalid_choice():
     with pytest.raises(TypeError, match=r"must contain at least one"):
+
         class Args1(Arguments):
             a: Choices[()]
 
     with pytest.raises(ValueError, match=r"Invalid default value"):
+
         class Args2(Arguments):
-            a: Choices['a'] = "b"  # wrong
+            a: Choices["a"] = "b"  # wrong
 
         _ = Args2()
 
     with pytest.raises(ValueError, match=r"must be string"):
+
         class Args3(Arguments):
-            a: Choices['1', 2]
+            a: Choices["1", 2]
 
         _ = Args3()
 
     with pytest.raises(ValueError, match=r"must be string"):
+
         class Args4(Arguments):
-            a: Literal['1', 2]
+            a: Literal["1", 2]
 
         _ = Args4()
 
@@ -76,12 +82,14 @@ def test_invalid_bool(capsys):
 
 def test_invalid_type():
     with pytest.raises(ValueError, match="Invalid type"):
+
         class Args(Arguments):
             a: 5 = 0
 
         _ = Args()
 
     with pytest.raises(ValueError, match="Invalid type"):
+
         class Args(Arguments):
             b: "str" = 1
 
