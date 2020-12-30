@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.6, 3.7, 3.8, 3.9]
 
     steps:
       - uses: actions/checkout@v2
@@ -21,12 +21,12 @@ jobs:
           pip install typing-extensions
       - name: Linting
         run: |
-          pip install pylint==2.4.4
+          pip install pylint==2.6.0
           # stop the build if there are Python syntax errors or undefined names
           pylint argtyped/
       - name: Typecheck
         run: |
-          pip install mypy==0.770
+          pip install mypy==0.790
           mypy .
       - name: Unit test
         run: |

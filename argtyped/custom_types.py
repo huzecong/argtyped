@@ -1,4 +1,5 @@
 import enum
+from collections import Iterable as IterableType
 from typing import Any, Iterable, Optional, Tuple, Type, TypeVar, Union
 
 __all__ = [
@@ -25,7 +26,7 @@ class _Choices:
         return self
 
     def __getitem__(self, values: Union[str, Iterable[str]]):
-        if isinstance(values, Iterable) and not isinstance(values, str):
+        if isinstance(values, IterableType) and not isinstance(values, str):
             parsed_values = tuple(values)
         else:
             parsed_values = (values,)
@@ -90,10 +91,11 @@ if HAS_LITERAL:
         metaclass.
         """
         return (
-            isinstance(typ, _Choices)
-            or getattr(typ, "__origin__", None) is Literal
-            or type(typ) is _Literal
-        )  # pylint: disable=unidiomatic-typecheck
+                isinstance(typ, _Choices)
+                or getattr(typ, "__origin__", None) is Literal
+                or type(typ) is _Literal  # pylint: disable=unidiomatic-typecheck
+        )
+
 
     def unwrap_choices(typ: type) -> Tuple[str, ...]:
         r"""
@@ -112,6 +114,7 @@ else:
         checked using traditional methods, since :class:`Choices` is a metaclass.
         """
         return isinstance(typ, _Choices)
+
 
     def unwrap_choices(typ: type) -> Tuple[str, ...]:
         r""" Return the string literals associated with the choices type. """

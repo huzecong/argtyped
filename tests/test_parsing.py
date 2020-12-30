@@ -1,5 +1,6 @@
 import argparse
 import enum
+import pickle
 from typing import Optional
 
 import pytest
@@ -137,3 +138,10 @@ def test_print():
     with pytest.raises(ValueError, match=r"cannot be drawn"):
         invalid_width = max(map(len, args._annotations)) + 7 + 6 - 1
         args.to_string(invalid_width)
+
+
+def test_pickle():
+    args = MyArguments(CMD)
+    args_restored = pickle.loads(pickle.dumps(args))
+    for key in RESULT:
+        assert RESULT[key] == getattr(args_restored, key)
