@@ -49,7 +49,7 @@ def test_unwrap_optional():
     assert unwrap_optional(Optional[int]) is int
     assert unwrap_optional(Optional["int"]).__forward_arg__ == "int"
     literal = Literal["a", "b", "c"]
-    assert unwrap_optional(Optional[literal]) is literal
+    assert unwrap_choices(unwrap_optional(Optional[literal])) == unwrap_choices(literal)
     assert unwrap_optional(Union[int, type(None)]) is int
 
 

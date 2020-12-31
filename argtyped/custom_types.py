@@ -141,7 +141,9 @@ def is_optional(typ: type) -> bool:
 
 
 def is_list(typ: type) -> bool:
-    return getattr(typ, "__origin__", None) is list
+    return (
+        getattr(typ, "__origin__", None) is list or getattr(typ, "_gorg", None) is list
+    )
 
 
 def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:

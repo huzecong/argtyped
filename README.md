@@ -300,3 +300,4 @@ This is what happens under the hood:
   - Technically this is not a problem, but there's no elegant way to configure whether this behavior is desired.
 - [ ] Throw (suppressable) warnings on using non-type callables as types.
 - [ ] Support converting an `attrs` class into `Arguments`.
+- [ ] Support forward references in type annotations.

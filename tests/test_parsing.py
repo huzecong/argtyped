@@ -173,7 +173,7 @@ def test_reject_invalid_choice_and_enum(catch_parse_error):
         a: List[Optional[MyEnum]]
 
     _ = Args2("--a a b none".split())
-    with catch_parse_error("invalid"):
+    with catch_parse_error("not a valid"):
         _ = Args2("--a a b none c".split())
 
 
