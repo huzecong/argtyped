@@ -9,13 +9,11 @@ from typing import (
     Callable,
     Dict,
     List,
-    Literal,
     NamedTuple,
     Optional,
     Tuple,
     Type,
     TypeVar,
-    Union,
 )
 
 from .custom_types import (
@@ -102,11 +100,13 @@ _TYPE_CONVERSION_FN: Dict[type, ConversionFn[Any]] = {
 }
 
 
-class ArgumentSpec(NamedTuple):
+class ArgumentSpec(NamedTuple):  # pylint: disable=inherit-non-class
+    # NOTE: pylint raises false-positive error only on Python 3.9. This will likely be
+    #  fixed in the next release (2.6.1).
     nullable: bool
     required: bool
-    value_type: Union[type, ConversionFn[Any]]
-    type: Literal["normal", "switch"]
+    value_type: type
+    type: str  # Literal["normal", "switch"]
     choices: Optional[Tuple[str, ...]] = None
     default: Optional[Any] = None
 
@@ -225,7 +225,7 @@ class ArgumentsMeta(ABCMeta):
         cls.__arguments__ = arguments
         return cls
 
-    def build_parser(cls):
+    def build_parser(cls) -> ArgumentParser:
         parser = ArgumentParser()
         for name, spec in cls.__arguments__.items():
             arg_name = "--" + name.replace("_", "-")
@@ -234,13 +234,13 @@ class ArgumentsMeta(ABCMeta):
                 conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
                 if spec.nullable:
                     conversion_fn = _optional_wrapper_fn(conversion_fn)
-                kwargs = {
+                kwargs: Dict[str, Any] = {
                     "required": spec.required,
                     "type": conversion_fn,
                 }
                 if not spec.required:
                     kwargs["default"] = spec.default
-                parser.add_argument(arg_name, **kwargs)
+                parser.add_argument(arg_name, **kwargs)  # type: ignore[]
             else:
                 assert spec.default is not None
                 parser.add_switch_argument(arg_name, spec.default)
@@ -252,7 +252,7 @@ class ArgumentsMeta(ABCMeta):
             parser.epilog = (
                 f"Note: Arguments defined in {cls.__module__}.{cls.__name__}"
             )
-        cls.__parser__ = parser
+        return parser
 
 
 class Arguments(metaclass=ArgumentsMeta, _root=True):
@@ -342,10 +342,10 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
     """
 
     def __init__(self, args: Optional[List[str]] = None):
-        if self.__parser__ is None:
-            self.__class__.build_parser()
-        namespace = self.__parser__.parse_args(args)
-        for arg_name in self.__arguments__:
+        if self.__class__.__parser__ is None:
+            self.__class__.__parser__ = self.__class__.build_parser()
+        namespace = self.__class__.__parser__.parse_args(args)
+        for arg_name in argument_specs(self.__class__):
             setattr(self, arg_name, getattr(namespace, arg_name))
 
     def to_dict(self) -> "OrderedDict[str, Any]":

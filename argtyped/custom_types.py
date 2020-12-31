@@ -10,6 +10,7 @@ __all__ = [
     "is_choices",
     "is_enum",
     "is_optional",
+    "unwrap_choices",
     "unwrap_optional",
 ]
 
