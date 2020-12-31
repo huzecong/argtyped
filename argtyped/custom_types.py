@@ -1,6 +1,6 @@
 import enum
 from collections.abc import Iterable as IterableType
-from typing import Any, Iterable, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
 __all__ = [
     "Choices",
@@ -9,8 +9,10 @@ __all__ = [
     "Switch",
     "is_choices",
     "is_enum",
+    "is_list",
     "is_optional",
     "unwrap_choices",
+    "unwrap_list",
     "unwrap_optional",
 ]
 
@@ -133,9 +135,20 @@ def is_optional(typ: type) -> bool:
     Check whether a type is `Optional[T]`. `Optional` is internally implemented as
     `Union` with `type(None)`.
     """
-    return getattr(typ, "__origin__", None) is Union and NoneType in typ.__args__  # type: ignore
+    return getattr(typ, "__origin__", None) is Union and NoneType in getattr(
+        typ, "__args__", ()
+    )
+
+
+def is_list(typ: type) -> bool:
+    return getattr(typ, "__origin__", None) is list
 
 
 def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:
     r""" Return the inner type inside an `Optional[T]` type. """
     return next(t for t in typ.__args__ if not isinstance(t, NoneType))  # type: ignore
+
+
+def unwrap_list(typ: Type[List[T]]) -> Type[T]:
+    r""" Return the inner type inside an `List[T]` type. """
+    return typ.__args__[0]

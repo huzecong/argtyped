@@ -15,8 +15,6 @@ def test_no_type_annotation():
             b = 2  # wrong
             c: int = 3
 
-        _ = Args()
-
 
 def test_non_nullable():
     with pytest.raises(TypeError, match=r"not nullable"):
@@ -25,8 +23,6 @@ def test_non_nullable():
             a: Optional[int] = None
             b: Optional[int]
             c: int = None  # wrong
-
-        _ = Args()
 
 
 def test_switch_not_bool():
@@ -39,8 +35,6 @@ def test_switch_not_bool():
             b: Switch  # wrong
             c: Switch = 0  # wrong
 
-        _ = Args()
-
 
 def test_invalid_choice():
     with pytest.raises(TypeError, match=r"must contain at least one"):
@@ -48,55 +42,42 @@ def test_invalid_choice():
         class Args1(Arguments):
             a: Choices[()]
 
-    with pytest.raises(TypeError, match=r"Invalid default value"):
+    with pytest.raises(TypeError, match=r"invalid default value"):
 
         class Args2(Arguments):
             a: Choices["a"] = "b"  # wrong
-
-        _ = Args2()
 
     with pytest.raises(TypeError, match=r"must be string"):
 
         class Args3(Arguments):
             a: Choices["1", 2]
 
-        _ = Args3()
-
     with pytest.raises(TypeError, match=r"must be string"):
 
         class Args4(Arguments):
             a: Literal["1", 2]
 
-        _ = Args4()
 
-
-def test_invalid_bool(capsys):
+def test_invalid_bool(catch_parse_error):
     class Args(Arguments):
         a: bool
 
     _ = Args(["--a", "True"])
     _ = Args(["--a", "Y"])
-    try:
+    with catch_parse_error(r"Invalid value .* for bool"):
         _ = Args(["--a=nah"])
-    except SystemExit:
-        captured = capsys.readouterr()
-        assert re.search(r"Invalid value .* for bool", captured.err) is not None
 
 
 def test_invalid_type():
-    with pytest.raises(TypeError, match="Invalid type"):
+    with pytest.raises(TypeError, match="invalid type"):
 
         class Args(Arguments):
             a: 5 = 0
 
-        _ = Args()
-
-    with pytest.raises(TypeError, match="Invalid type"):
+    with pytest.raises(TypeError, match="invalid type"):
 
         class Args(Arguments):
             b: "str" = 1
-
-        _ = Args()
 
 
 def test_invalid_enum():
@@ -104,9 +85,10 @@ def test_invalid_enum():
         a = auto()
         b = auto()
 
-    with pytest.raises(TypeError, match="Invalid default value"):
+    with pytest.raises(TypeError, match="invalid default value"):
 
-        class Args(Arguments):
+        class Args1(Arguments):
             enum: MyEnum = "c"
 
-        _ = Args()
+        class Args(Arguments):
+            enum: MyEnum = "b"  # must be enum value, not string

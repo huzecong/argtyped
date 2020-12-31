@@ -14,14 +14,17 @@ from typing import (
     Tuple,
     Type,
     TypeVar,
+    Union,
 )
 
 from .custom_types import (
     Switch,
     is_choices,
     is_enum,
+    is_list,
     is_optional,
     unwrap_optional,
+    unwrap_list,
     unwrap_choices,
 )
 
@@ -106,8 +109,8 @@ class ArgumentSpec(NamedTuple):  # pylint: disable=inherit-non-class
     nullable: bool
     required: bool
     value_type: type
-    type: str  # Literal["normal", "switch"]
-    choices: Optional[Tuple[str, ...]] = None
+    type: str  # Literal["normal", "switch", "sequence"]
+    choices: Optional[Tuple[Any, ...]] = None
     default: Optional[Any] = None
 
 
@@ -153,26 +156,63 @@ class ArgumentsMeta(ABCMeta):
         for arg_name, arg_typ in annotations.items():
             has_default = arg_name in namespace
             default_val = namespace.get(arg_name, None)
+
+            # On sequence and nullable types:
+            # - Nested lists (e.g. `List[List[T]]`) are not supported.
+            # - When mixing `List` and `Optional`, the only allowed variant is
+            #   `List[Optional[T]]`. Anything else (`Optional[List[T]]`,
+            #   `Optional[List[Optional[T]]]`) are invalid.
+            sequence = is_list(arg_typ)
+            if sequence:
+                arg_typ = unwrap_list(arg_typ)
             nullable = is_optional(arg_typ)
             if nullable:
                 # extract the type wrapped inside `Optional`
                 arg_typ = unwrap_optional(arg_typ)
+            if is_list(arg_typ):
+                raise TypeError(
+                    f"Argument {arg_name!r} has invalid type {annotations[arg_name]!r}."
+                    f" 'List' type cannot be nested inside 'List' or 'Optional'"
+                )
 
             required = False
-            if nullable and not has_default:
-                has_default = True
-                default_val = None
-            elif not nullable and not has_default:
-                required = True
+            if not has_default:
+                if nullable and not sequence:
+                    has_default = True
+                    default_val = None
+                elif not nullable:
+                    required = True
 
             if not nullable and has_default and default_val is None:
                 raise TypeError(
                     f"Argument {arg_name!r} has default value of None, but is not "
-                    f"nullable. Change type annotation to `Optional[...]` to allow "
-                    f"values of `None`"
+                    f"nullable. Change type annotation to 'Optional[...]' to allow "
+                    f"values of None"
                 )
 
+            def check_default(check_fn: Callable[[T], bool]) -> None:
+                def _check_default(val: Any) -> bool:
+                    if val is None:
+                        return nullable
+                    return check_fn(val)
+
+                if not has_default:
+                    return
+                if sequence:
+                    correct = isinstance(default_val, list) and all(
+                        _check_default(x) for x in default_val
+                    )
+                else:
+                    correct = _check_default(default_val)
+                if not correct:
+                    raise TypeError(f"Argument {arg_name!r} has invalid default value")
+
             if arg_typ is Switch:  # type: ignore[misc]
+                if sequence:
+                    raise TypeError(
+                        f"Argument {arg_name!r} has invalid type "
+                        f"{annotations[arg_name]!r}"
+                    )
                 if not isinstance(default_val, bool):
                     raise TypeError(
                         f"Switch argument {arg_name!r} must have a default value of "
@@ -188,29 +228,23 @@ class ArgumentsMeta(ABCMeta):
             else:
                 if is_enum(arg_typ):
                     value_type = arg_typ
-                    choices = tuple(x.name for x in arg_typ)
-                    if has_default and not isinstance(default_val, arg_typ):
-                        raise TypeError(
-                            f"Invalid default value for argument {arg_name!r}"
-                        )
+                    choices = tuple(arg_typ)
+                    check_default(lambda val: isinstance(val, arg_typ))
                 elif is_choices(arg_typ):
                     value_type = str
                     choices = unwrap_choices(arg_typ)
                     if any(not isinstance(choice, str) for choice in choices):
                         raise TypeError("All choices must be strings")
-                    if has_default and default_val not in choices:
-                        raise TypeError(
-                            f"Invalid default value for argument {arg_name!r}"
-                        )
+                    check_default(lambda val: val in choices)
                 else:
                     if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
                         raise TypeError(
-                            f"Invalid type {arg_typ!r} for argument {arg_name!r}"
+                            f"Argument {arg_name!r} has invalid type {arg_typ!r}"
                         )
                     value_type = arg_typ
                     choices = None
                 spec = ArgumentSpec(
-                    type="normal",
+                    type="sequence" if sequence else "normal",
                     nullable=nullable,
                     required=required,
                     value_type=value_type,
@@ -229,7 +263,7 @@ class ArgumentsMeta(ABCMeta):
         parser = ArgumentParser()
         for name, spec in cls.__arguments__.items():
             arg_name = "--" + name.replace("_", "-")
-            if spec.type == "normal":
+            if spec.type in {"normal", "sequence"}:
                 arg_type = spec.value_type
                 conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
                 if spec.nullable:
@@ -238,9 +272,21 @@ class ArgumentsMeta(ABCMeta):
                     "required": spec.required,
                     "type": conversion_fn,
                 }
+                if spec.choices is not None:
+                    if spec.nullable:
+                        kwargs["choices"] = spec.choices + (None,)
+                    else:
+                        kwargs["choices"] = spec.choices
+                    if is_enum(spec.value_type):
+                        # Display only the enum names in help.
+                        kwargs["metavar"] = (
+                            "{" + ",".join(val.name for val in spec.choices) + "}"
+                        )
                 if not spec.required:
                     kwargs["default"] = spec.default
-                parser.add_argument(arg_name, **kwargs)  # type: ignore[]
+                if spec.type == "sequence":
+                    kwargs["nargs"] = "*"
+                parser.add_argument(arg_name, **kwargs)
             else:
                 assert spec.default is not None
                 parser.add_switch_argument(arg_name, spec.default)
@@ -407,7 +453,9 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
         return self.to_string(max_width=columns)
 
 
-def argument_specs(args_class: Type[Arguments]) -> "OrderedDict[str, ArgumentSpec]":
+def argument_specs(
+    args_class: Union[Arguments, Type[Arguments]]
+) -> "OrderedDict[str, ArgumentSpec]":
     r"""
     Return a dictionary mapping argument names to their specs (:class:`ArgumentSpec`
     objects).

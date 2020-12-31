@@ -55,7 +55,7 @@ def test_argument_specs():
             nullable=False,
             required=True,
             value_type=MyEnum,
-            choices=("A", "B"),
+            choices=(MyEnum.A, MyEnum.B),
         ),
         "e": ArgumentSpec(
             type="normal", nullable=False, required=True, value_type=float

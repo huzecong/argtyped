@@ -6,7 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- `__repr__` method for `Arguments`.
+- Support for list arguments. (#1)
+- `__repr__` method for `Arguments`. (#2)
 - Defined arguments are now stored in a special class variable `__arguments__` in the `Arguments` subclass namespace.
   A utility function `argtyped.argument_specs(Args)` is provided to inspect the specifications of the arguments.
 
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   class DerivedArgs(BaseArgs):
       foo: Choices["a", "b"]
   ```
+- `Optional[Literal[...]]` is now correctly supported.
 
 ## [0.2.0] - 2020-06-15
 ### Added

@@ -33,7 +33,7 @@ With `argtyped`, you can define command line arguments in a syntax similar to
 be illustrated with an example:
 ```python
 from typing import Optional
-from typing_extensions import Literal
+from typing_extensions import Literal  # or directly import from `typing` in Python 3.8+
 
 from argtyped import Arguments, Switch
 from argtyped import Enum, auto
@@ -94,14 +94,14 @@ python main.py \
     --no-use-dropout \
     --dropout-prob none
 ```
-Then the parsed arguments will be equivalent to the following structured returned by `argparse`:
+Then the parsed arguments will be equivalent to the following structure returned by `argparse`:
 ```python
 argparse.Namespace(
     model_name="LSTM", hidden_size=512, activation="sigmoid", logging_level="debug",
     use_dropout=False, dropout_prob=None)
 ```
 
-Arguments can also be pretty-printed with `print(args.to_string())`, which gives:
+Arguments can also be pretty-printed: `print(args)` gives:
 ```
 <class '__main__.MyArguments'>
 ╔═════════════════╤══════════════════════════════════╗
@@ -118,6 +118,7 @@ Arguments can also be pretty-printed with `print(args.to_string())`, which gives
 ║ some_false_arg  │ False                            ║
 ╚═════════════════╧══════════════════════════════════╝
 ```
+It is recommended though to use the `args.to_string()` method, which gives you control of the table width.
 
 ## Reference
 
@@ -155,6 +156,11 @@ Represent the arguments as a table.
 - `max_width`: Maximum width of the printed table. Defaults to `None`, meaning no limits. Must be `None` if `width` is
   not `None`.
 
+#### `argtyped.argument_specs`
+
+Return a dictionary mapping argument names to their specifications, represented as the `argtyped.ArgumentSpec` type.
+This is useful for programmatically accessing the list of arguments.
+
 ### Argument Types
 
 To summarize, whatever works for `argparse` works here. The following types are supported:
@@ -182,7 +188,7 @@ To summarize, whatever works for `argparse` works here. The following types are 
   
   **Note:** The choice type was previously named `Choices`. This is deprecated in favor of the
   [`Literal` type](https://mypy.readthedocs.io/en/stable/literal_types.html) introduced in Python 3.8 and back-ported to
-  3.6 and 3.7 in the `typing_extensions` library. Please see [Caveats](#caveats) for a discussing on the differences
+  3.6 and 3.7 in the `typing_extensions` library. Please see [Notes](#notes) for a discussing on the differences
   between the two.
 - Enum types derived from `enum.Enum`. It is recommended to use `argtyped.Enum` which uses the instance names as values:
   ```python
@@ -208,9 +214,14 @@ To summarize, whatever works for `argparse` works here. The following types are 
   # argv: ["--switch=false"]                 => WRONG
   # argv: ["--no-bool-arg"]                  => WRONG
   ```
-- Optional types `Optional[T]`, where `T` is any supported type (except choices or switch). An optional argument will be
-  filled with `None` if no value is provided. It could also be explicitly set to `None` by using `none` as value in the
-  command line:
+- List types `List[T]`, where `T` is any supported type except switch types. List arguments allow passing multiple
+  values on the command line following the argument flag, it is equivalent to setting `nargs="*"` in `argparse`.
+  
+  Although there is no built-in support for other `nargs` settings such as `"+"` (one or more) or `N` (fixed number),
+  you can add custom validation logic by overriding the `__init__` method in your `Arguments` subclass.
+- Optional types `Optional[T]`, where `T` is any supported type except list or switch types. An optional argument will
+  be filled with `None` if no value is provided. It could also be explicitly set to `None` by using `none` as value in
+  the command line:
   ```python
   from argtyped import Arguments
   from typing import Optional
@@ -224,43 +235,68 @@ To summarize, whatever works for `argparse` works here. The following types are 
   ```
 - Any other type that takes a single `str` as `__init__` parameters. It is also theoretically possible to use a function
   that takes an `str` as input, but it's not recommended as it's not type-safe.
-
-
-## Caveats
+  
+## Notes
 
 - Advanced `argparse` features such as subparsers, groups, argument lists, and custom actions are not supported.
 - Using switch arguments may result in name clashes: if a switch argument has name `arg`, there can be no argument with
   the name `no_arg`.
-- `Optional` cannot be used with `Choices`. You can add `"none"` as a valid choice to mimic a similar behavior.
-- `Optional[str]` would parse a value of `"none"` into `None`.
+- Optional types:
+  - `Optional` can be used with `Literal`, but cannot be used with `Choices`:
+    ```python
+    from argtyped import Arguments, Choices
+    from typing import Literal, Optional
+    
+    class MyArgs(Arguments):
+        foo: Optional[Literal["a", "b"]]  # valid
+        bar: Optional[Choices["a", "b"]]  # invalid
+        baz: Choices["a", "b", "none"]    # not elegant but it works
+    ```
+  - `Optional[str]` would parse a value of `"none"` (case-insensitive) into `None`.
+- List types:
+  - `List[Optional[T]]` is a valid type. For example:
+    ```python
+    from argtyped import Arguments
+    from typing import List, Literal, Optional
+    
+    class MyArgs(Arguments):
+        foo: List[Optional[Literal["a", "b"]]] = ["a", None, "b"]  # valid
+    
+    # argv: ["--foo", "a", "b", "none", "a", "b"] => foo=["a", "b", None, "a", "b"]
+    ```
+  - List types cannot be nested inside a list or an optional type. Types such as `Optional[List[int]]` and
+    `List[List[int]]` are not accepted.
 - `Choices` vs `Literal`:
-    - When all choices are defined as string literals, the two types are interchangeable.
-    - Pros for `Choices`:
-        - The `Choices` parameter can be an expression that evaluate to an iterable of strings, while `Literal` only
-          supports string literals as parameters.
-        - `Literal` requires installing the `typing_extensions` package in Python versions prior to 3.8. This package is
-          not listed as a prerequisite of `argtyped` so you must manually install it.
-    - Pros for `Literal`:
-        - `Literal` is a built-in type supported by type-checkers and IDEs. You can get better type inference with
-          `Literal`, and the IDE won't warn you that your choices are "undefined" (because it interprets the string
-          literals as forward references).
-        - `Literal` can be combined with `Optional`.
+  - `Choices` is deprecated. In general, you should prefer `Literal` to `Choices`.
+  - When all choices are defined as string literals, the two types are interchangeable.
+  - Pros for `Choices`:
+    - The `Choices` parameter can be an expression that evaluate to an iterable of strings, while `Literal` only
+      supports string literals as parameters.
+    - `Literal` requires installing the `typing_extensions` package in Python versions prior to 3.8. This package is
+      not listed as a prerequisite of `argtyped` so you must manually install it.
+  - Pros for `Literal`:
+    - `Literal` is a built-in type supported by type-checkers and IDEs. You can get better type inference with
+      `Literal`, and the IDE won't warn you that your choices are "undefined" (because it interprets the string literals
+      as forward references).
+    - `Literal` can be combined with `Optional`.
 
 ## Under the Hood
 
 This is what happens under the hood:
-1. When an instance of `argtyped.Arguments` (or any subclass) is initialized, type annotations and class-level
-   attributes (i.e., the default values) are collected to form argument declarations.
-2. After verifying the validity of declared arguments, an instance of `argparse.ArgumentParser` is created and arguments
-   are registered with the parser.
-3. The parser's `parse_args` method is invoked with either `sys.argv` or strings provided as parameters, returning
+1. When a subclass of `argtyped.Arguments` is constructed, type annotations and class-level attributes (i.e., the
+   default values) are collected to form argument declarations.
+2. After verifying the validity of declared arguments, `argtyped.ArgumentSpec` are created for each argument and stored
+   within the subclass as the `__arguments__` class attribute.
+3. When an instance of the subclass is initialized, if it's the first time, an instance of `argparse.ArgumentParser` is
+   created and arguments are registered with the parser. The parser is cached in the subclass as the `__parser__`
+   attribute.
+4. The parser's `parse_args` method is invoked with either `sys.argv` or strings provided as parameters, returning
    parsed arguments.
-4. The parsed arguments are assigned to `self` (the instance of `Arguments` subclass being initialized).
+5. The parsed arguments are assigned to `self` (the instance of the `Arguments` subclass being initialized).
 
 ## Todo
 
-- [ ] Support `List[Choices[...]]` and `Optional[Choices[...]]`.
 - [ ] Support `action="append"` or `action="extend"` for `List[T]` types.
-    - Technically this is not a problem, but there's no elegant way to configure whether this behavior is desired.
-- [ ] Move parser construction to subclass initialization phase. This should allow us to detect error earlier.
-- [ ] Add type validity checks before parsing. Also throw (suppressable) warnings on using non-type callables as types.
+  - Technically this is not a problem, but there's no elegant way to configure whether this behavior is desired.
+- [ ] Throw (suppressable) warnings on using non-type callables as types.
+- [ ] Support converting an `attrs` class into `Arguments`.

@@ -1,7 +1,7 @@
 import argparse
 import enum
 import pickle
-from typing import Optional
+from typing import List, Optional
 
 import pytest
 from typing_extensions import Literal
@@ -42,6 +42,7 @@ class MyArguments(Arguments):
     label_smoothing: Optional[float]
     some_true_arg: bool
     some_false_arg: bool
+    some_list_arg: List[Optional[Literal["a", "b", "c"]]] = ["a", None, "b"]
 
 
 CMD = r"""
@@ -54,6 +55,7 @@ CMD = r"""
     --label-smoothing 0.1
     --some-true-arg=yes
     --some-false-arg n
+    --some-list-arg a c none b c
     """.split()
 
 RESULT = dict(
@@ -67,6 +69,7 @@ RESULT = dict(
     label_smoothing=0.1,
     some_true_arg=True,
     some_false_arg=False,
+    some_list_arg=["a", "c", None, "b", "c"],
 )
 
 
@@ -106,6 +109,13 @@ def test_parse():
     parser.add_argument(
         "--some-false-arg", type=_TYPE_CONVERSION_FN[bool], required=True
     )
+    parser.add_argument(
+        "--some-list-arg",
+        type=lambda s: None if s.lower() == "none" else str(s),
+        choices=["a", "b", "c", "none", None],
+        nargs="*",
+        default=["a", None, "b"],
+    )
 
     namespace = parser.parse_args(CMD)
     assert isinstance(namespace, argparse.Namespace)
@@ -116,7 +126,55 @@ def test_parse():
     for key in RESULT:
         assert RESULT[key] == getattr(args, key)
 
-    assert args.to_dict() == RESULT
+    assert dict(args.to_dict()) == RESULT
+
+
+def test_list_optional_literal():
+    class Args1(Arguments):
+        a: List[Optional[int]] = [1, None]
+
+    assert Args1("--a 1 2 none 1".split()).a == [1, 2, None, 1]
+
+    class Args2(Arguments):
+        a: Optional[Literal["a", "b"]]
+
+    assert Args2("--a none".split()).a is None
+
+    class Args3(Arguments):
+        a: List[Optional[Literal["a", "b"]]] = ["a", None, "b"]
+
+    assert Args3("--a a b None a b".split()).a == ["a", "b", None, "a", "b"]
+
+
+def test_list_optional_enum():
+    class MyEnum(Enum):
+        A = auto()
+        B = auto()
+
+    class Args(Arguments):
+        a: List[Optional[MyEnum]] = [MyEnum.A, None]
+
+    assert Args("--a a b None a".split()).a == [MyEnum.A, MyEnum.B, None, MyEnum.A]
+
+
+def test_reject_invalid_choice_and_enum(catch_parse_error):
+    class Args1(Arguments):
+        a: List[Optional[Literal["a", "b"]]]
+
+    _ = Args1("--a a b none".split())
+    with catch_parse_error("invalid choice"):
+        _ = Args1("--a a b none c".split())
+
+    class MyEnum(Enum):
+        A = auto()
+        B = auto()
+
+    class Args2(Arguments):
+        a: List[Optional[MyEnum]]
+
+    _ = Args2("--a a b none".split())
+    with catch_parse_error("invalid"):
+        _ = Args2("--a a b none c".split())
 
 
 def test_print():
