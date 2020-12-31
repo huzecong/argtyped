@@ -152,6 +152,20 @@ class ArgumentsMeta(ABCMeta):
                 if key not in annotations and key not in arguments:
                     raise TypeError(f"Argument {key!r} does not have type annotation")
 
+        def type_error(message: str) -> None:
+            # pylint: disable=undefined-loop-variable
+            raise TypeError(
+                f"Argument {arg_name!r} has invalid type {annotations[arg_name]!r}: "
+                + message
+            )
+
+        def value_error(message: str) -> None:
+            # pylint: disable=undefined-loop-variable
+            raise TypeError(
+                f"Argument {arg_name!r} has invalid default value {default_val!r}: "
+                + message
+            )
+
         # Check validity of arguments and create specs.
         for arg_name, arg_typ in annotations.items():
             has_default = arg_name in namespace
@@ -167,12 +181,11 @@ class ArgumentsMeta(ABCMeta):
                 arg_typ = unwrap_list(arg_typ)
             nullable = is_optional(arg_typ)
             if nullable:
-                # extract the type wrapped inside `Optional`
                 arg_typ = unwrap_optional(arg_typ)
-            if is_list(arg_typ):
-                raise TypeError(
-                    f"Argument {arg_name!r} has invalid type {annotations[arg_name]!r}."
-                    f" 'List' type cannot be nested inside 'List' or 'Optional'"
+            if (sequence or nullable) and (arg_typ is Switch or is_list(arg_typ)):
+                type_error(
+                    f"{'List' if is_list(arg_typ) else 'Switch'!r} cannot be "
+                    f"nested inside {'List' if sequence else 'Optional'!r}",
                 )
 
             required = False
@@ -184,40 +197,13 @@ class ArgumentsMeta(ABCMeta):
                     required = True
 
             if not nullable and has_default and default_val is None:
-                raise TypeError(
-                    f"Argument {arg_name!r} has default value of None, but is not "
-                    f"nullable. Change type annotation to 'Optional[...]' to allow "
-                    f"values of None"
+                value_error(
+                    "Change type annotation to 'Optional[...]' to allow values of None"
                 )
 
-            def check_default(check_fn: Callable[[T], bool]) -> None:
-                def _check_default(val: Any) -> bool:
-                    if val is None:
-                        return nullable
-                    return check_fn(val)
-
-                if not has_default:
-                    return
-                if sequence:
-                    correct = isinstance(default_val, list) and all(
-                        _check_default(x) for x in default_val
-                    )
-                else:
-                    correct = _check_default(default_val)
-                if not correct:
-                    raise TypeError(f"Argument {arg_name!r} has invalid default value")
-
-            if arg_typ is Switch:  # type: ignore[misc]
-                if sequence:
-                    raise TypeError(
-                        f"Argument {arg_name!r} has invalid type "
-                        f"{annotations[arg_name]!r}"
-                    )
+            if arg_typ is Switch:
                 if not isinstance(default_val, bool):
-                    raise TypeError(
-                        f"Switch argument {arg_name!r} must have a default value of "
-                        f"type bool"
-                    )
+                    value_error("Switch argument must have a boolean default value")
                 spec = ArgumentSpec(
                     type="switch",
                     nullable=False,
@@ -226,21 +212,25 @@ class ArgumentsMeta(ABCMeta):
                     default=default_val,
                 )
             else:
-                if is_enum(arg_typ):
-                    value_type = arg_typ
-                    choices = tuple(arg_typ)
-                    check_default(lambda val: isinstance(val, arg_typ))
-                elif is_choices(arg_typ):
-                    value_type = str
-                    choices = unwrap_choices(arg_typ)
-                    if any(not isinstance(choice, str) for choice in choices):
-                        raise TypeError("All choices must be strings")
-                    check_default(lambda val: val in choices)
+                if sequence and has_default and not isinstance(default_val, list):
+                    value_error("Default for list argument must be of list type")
+                if is_enum(arg_typ) or is_choices(arg_typ):
+                    if is_enum(arg_typ):
+                        value_type = arg_typ
+                        choices = tuple(arg_typ)
+                    else:
+                        value_type = str
+                        choices = unwrap_choices(arg_typ)
+                        if any(not isinstance(choice, str) for choice in choices):
+                            type_error("All choices must be strings")
+                    if has_default:
+                        if sequence and not all(x in choices for x in default_val):
+                            value_error("All list items must be among valid choices")
+                        if not sequence and default_val not in choices:
+                            value_error("Value must be among valid choices")
                 else:
                     if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
-                        raise TypeError(
-                            f"Argument {arg_name!r} has invalid type {arg_typ!r}"
-                        )
+                        type_error("Unsupported type")
                     value_type = arg_typ
                     choices = None
                 spec = ArgumentSpec(
@@ -460,4 +450,6 @@ def argument_specs(
     Return a dictionary mapping argument names to their specs (:class:`ArgumentSpec`
     objects).
     """
+    if isinstance(args_class, Arguments):
+        return args_class.__class__.__arguments__
     return args_class.__arguments__

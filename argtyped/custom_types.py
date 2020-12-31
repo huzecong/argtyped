@@ -151,4 +151,4 @@ def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:
 
 def unwrap_list(typ: Type[List[T]]) -> Type[T]:
     r""" Return the inner type inside an `List[T]` type. """
-    return typ.__args__[0]
+    return typ.__args__[0]  # type: ignore[attr-defined]
