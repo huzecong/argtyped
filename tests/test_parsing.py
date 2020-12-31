@@ -126,17 +126,19 @@ def test_print():
     output = args.to_string(width)
     for line in output.strip().split("\n")[1:]:  # first line is class type
         assert len(line) == width
-    for key in args._annotations:
+    for key in argument_specs(args):
         assert key in output
 
     output = args.to_string(max_width=width)
     for line in output.strip().split("\n")[1:]:
         assert len(line) <= width
 
+    print(args)  # check that `__repr__` works
+
     with pytest.raises(ValueError, match=r"must be None"):
         args.to_string(width, width)
     with pytest.raises(ValueError, match=r"cannot be drawn"):
-        invalid_width = max(map(len, args._annotations)) + 7 + 6 - 1
+        invalid_width = max(map(len, argument_specs(args))) + 7 + 6 - 1
         args.to_string(invalid_width)
 
 

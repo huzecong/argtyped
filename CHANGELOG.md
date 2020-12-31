@@ -6,7 +6,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- `__repr__` method for `Arguments`.
+- Defined arguments are now stored in a special class variable `__arguments__` in the `Arguments` subclass namespace.
+  A utility function `argtyped.argument_specs(Args)` is provided to inspect the specifications of the arguments.
+
 ### Changed
+- Annotations are now parsed on class construction, and the `argparse.ArgumentParser` object is stored for the whole
+  lifetime of the class as `__parser__`.
+- Exceptions thrown for invalid type annotations are changed from `ValueError`s to `TypeError`s.
+
+### Fixed
+- It is now possible to override an argument with default value defined in the base class with a new argument that does
+  not have a default. Namely, the following code is now valid (although discouraged):
+  ```python
+  from argtyped import Arguments, Choices
+  
+  class BaseArgs(Arguments):
+      foo: int = 0
+  
+  class DerivedArgs(BaseArgs):
+      foo: Choices["a", "b"]
+  ```
 
 ## [0.2.0] - 2020-06-15
 ### Added
