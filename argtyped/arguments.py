@@ -198,7 +198,8 @@ class ArgumentsMeta(ABCMeta):
 
             if not nullable and has_default and default_val is None:
                 value_error(
-                    "Change type annotation to 'Optional[...]' to allow values of None"
+                    "Argument not nullable. Change type annotation to 'Optional[...]' "
+                    "to allow values of None"
                 )
 
             if arg_typ is Switch:
@@ -224,9 +225,10 @@ class ArgumentsMeta(ABCMeta):
                         if any(not isinstance(choice, str) for choice in choices):
                             type_error("All choices must be strings")
                     if has_default:
-                        if sequence and not all(x in choices for x in default_val):
-                            value_error("All list items must be among valid choices")
-                        if not sequence and default_val not in choices:
+                        if not all(
+                            x in choices or (x is None and nullable)
+                            for x in (default_val if sequence else [default_val])
+                        ):
                             value_error("Value must be among valid choices")
                 else:
                     if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):

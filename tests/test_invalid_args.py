@@ -26,9 +26,7 @@ def test_non_nullable():
 
 
 def test_switch_not_bool():
-    with pytest.raises(
-        TypeError, match=r"Switch argument .* default value of type bool"
-    ):
+    with pytest.raises(TypeError, match=r"must have a boolean default value"):
 
         class Args(Arguments):
             a: Switch = True
