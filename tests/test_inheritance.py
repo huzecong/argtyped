@@ -20,7 +20,7 @@ class BaseArgs(Arguments):
 class DerivedArgs(BaseArgs):
     e: float
     b: Literal["a", "b", "c"] = "b"
-    c: MyEnum
+    c: MyEnum  # override base argument w/ default
 
 
 def test_argument_specs():
