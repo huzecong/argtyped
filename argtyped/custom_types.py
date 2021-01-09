@@ -142,7 +142,7 @@ def is_optional(typ: type) -> bool:
 
 def is_list(typ: type) -> bool:
     return (
-        getattr(typ, "__origin__", None) is list or getattr(typ, "_gorg", None) is list
+        getattr(typ, "__origin__", None) is list or getattr(typ, "_gorg", None) is List
     )
 
 
