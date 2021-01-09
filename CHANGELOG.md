@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.0]
 ### Added
 - Support for list arguments. (#1)
 - `__repr__` method for `Arguments`. (#2)
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
       foo: Choices["a", "b"]
   ```
 - `Optional[Literal[...]]` is now correctly supported.
+- `Optional[Switch]` is now correctly detected (although invalid).
 
 ## [0.2.0] - 2020-06-15
 ### Added
@@ -45,6 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers.
 - Switch types: `Switch`.
 
-[Unreleased]: https://github.com/huzecong/argtyped/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/huzecong/argtyped/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/huzecong/argtyped/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/huzecong/argtyped/compare/v0.1...v0.2.0
 [0.1]: https://github.com/huzecong/argtyped/releases/tag/v0.1
