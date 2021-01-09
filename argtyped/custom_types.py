@@ -148,7 +148,12 @@ def is_list(typ: type) -> bool:
 
 def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:
     r""" Return the inner type inside an `Optional[T]` type. """
-    return next(t for t in typ.__args__ if not isinstance(t, NoneType))  # type: ignore
+    remain_types = [t for t in typ.__args__ if t is not NoneType]
+    if len(remain_types) >= 2:
+        if set(remain_types) == set(Switch.__args__):
+            return Switch
+        raise TypeError(f"Invalid type {typ}: 'Union' types are not supported")
+    return remain_types[0]
 
 
 def unwrap_list(typ: Type[List[T]]) -> Type[T]:

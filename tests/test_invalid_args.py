@@ -1,5 +1,4 @@
-import re
-from typing import Optional
+from typing import List, Optional, Union
 
 import pytest
 from typing_extensions import Literal
@@ -56,6 +55,45 @@ def test_invalid_choice():
             a: Literal["1", 2]
 
 
+def test_invalid_list():
+    with pytest.raises(TypeError, match="must be of list type"):
+
+        class Args1(Arguments):
+            a: List[Optional[int]] = None
+
+
+def test_invalid_nesting():
+    with pytest.raises(TypeError, match="'List' cannot be nested inside 'List'"):
+
+        class Args1(Arguments):
+            a: List[List[int]]
+
+    with pytest.raises(TypeError, match="'List' cannot be nested inside 'Optional'"):
+
+        class Args2(Arguments):
+            a: Optional[List[int]]
+
+    with pytest.raises(TypeError, match="'Switch' cannot be nested inside 'List'"):
+
+        class Args3(Arguments):
+            a: List[Switch]
+
+    with pytest.raises(TypeError, match="'Switch' cannot be nested inside 'Optional'"):
+
+        class Args4(Arguments):
+            a: Optional[Switch]
+
+    with pytest.raises(TypeError, match="cannot be nested"):
+
+        class Args5(Arguments):
+            a: List[Optional[List[int]]]
+
+    with pytest.raises(TypeError, match="'Union' .*not supported"):
+
+        class Args6(Arguments):
+            a: Optional[Union[int, float]]
+
+
 def test_invalid_bool(catch_parse_error):
     class Args(Arguments):
         a: bool
@@ -69,12 +107,12 @@ def test_invalid_bool(catch_parse_error):
 def test_invalid_type():
     with pytest.raises(TypeError, match="invalid type"):
 
-        class Args(Arguments):
+        class Args1(Arguments):
             a: 5 = 0
 
     with pytest.raises(TypeError, match="invalid type"):
 
-        class Args(Arguments):
+        class Args2(Arguments):
             b: "str" = 1
 
 
