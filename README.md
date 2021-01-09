@@ -101,8 +101,9 @@ argparse.Namespace(
     use_dropout=False, dropout_prob=None)
 ```
 
-Arguments can also be pretty-printed: `print(args)` gives:
+Arguments can also be pretty-printed:
 ```
+>>> print(args)
 <class '__main__.MyArguments'>
 ╔═════════════════╤══════════════════════════════════╗
 ║ Arguments       │ Values                           ║
@@ -165,11 +166,12 @@ This is useful for programmatically accessing the list of arguments.
 
 To summarize, whatever works for `argparse` works here. The following types are supported:
 
-- Built-in types such as `int`, `float`, `str`.
-- `bool` type. Accepted values (case-insensitive) for `True` are: `y`, `yes`, `true`, `ok`; accepted values for `False`
-  are: `n`, `no`, `false`.
-- Choice types `Literal[...]` or `Choices[...]`. A choice argument is essentially an `str` argument with limited choice
-  of values. The ellipses can be filled with a tuple of `str`s, or an expression that evaluates to a list of `str`s:
+- **Built-in types** such as `int`, `float`, `str`.
+- **Boolean type** `bool`. Accepted values (case-insensitive) for `True` are: `y`, `yes`, `true`, `ok`; accepted values
+  for `False` are: `n`, `no`, `false`.
+- **Choice types** `Literal[...]` or `Choices[...]`. A choice argument is essentially an `str` argument with limited
+  choice of values. The ellipses can be filled with a tuple of `str`s, or an expression that evaluates to a list of
+  `str`s:
   ```python
   from argtyped import Arguments, Choices
   from typing import List
@@ -190,7 +192,8 @@ To summarize, whatever works for `argparse` works here. The following types are 
   [`Literal` type](https://mypy.readthedocs.io/en/stable/literal_types.html) introduced in Python 3.8 and back-ported to
   3.6 and 3.7 in the `typing_extensions` library. Please see [Notes](#notes) for a discussing on the differences
   between the two.
-- Enum types derived from `enum.Enum`. It is recommended to use `argtyped.Enum` which uses the instance names as values:
+- **Enum types** derived from `enum.Enum`. It is recommended to use `argtyped.Enum` which uses the instance names as
+  values:
   ```python
   from argtyped import Enum
 
@@ -199,7 +202,7 @@ To summarize, whatever works for `argparse` works here. The following types are 
       Info = auto()     # "info"
       Warning = auto()  # "warning"
   ```
-- Switch types `Switch`. `Switch` arguments are like `bool` arguments, but they don't take values. Instead, a switch
+- **Switch types** `Switch`. `Switch` arguments are like `bool` arguments, but they don't take values. Instead, a switch
   argument `switch` requires `--switch` to enable and `--no-switch` to disable:
   ```python
   from argtyped import Arguments, Switch
@@ -214,14 +217,14 @@ To summarize, whatever works for `argparse` works here. The following types are 
   # argv: ["--switch=false"]                 => WRONG
   # argv: ["--no-bool-arg"]                  => WRONG
   ```
-- List types `List[T]`, where `T` is any supported type except switch types. List arguments allow passing multiple
+- **List types** `List[T]`, where `T` is any supported type except switch types. List arguments allow passing multiple
   values on the command line following the argument flag, it is equivalent to setting `nargs="*"` in `argparse`.
   
   Although there is no built-in support for other `nargs` settings such as `"+"` (one or more) or `N` (fixed number),
   you can add custom validation logic by overriding the `__init__` method in your `Arguments` subclass.
-- Optional types `Optional[T]`, where `T` is any supported type except list or switch types. An optional argument will
-  be filled with `None` if no value is provided. It could also be explicitly set to `None` by using `none` as value in
-  the command line:
+- **Optional types** `Optional[T]`, where `T` is any supported type except list or switch types. An optional argument
+  will be filled with `None` if no value is provided. It could also be explicitly set to `None` by using `none` as value
+  in the command line:
   ```python
   from argtyped import Arguments
   from typing import Optional
