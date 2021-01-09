@@ -5,7 +5,7 @@ with open("README.md", "r") as f:
 
 setuptools.setup(
     name="argtyped",
-    version="0.2.0.post0",
+    version="0.3.0",
     url="https://github.com/huzecong/argtyped",
     author="Zecong Hu",
     author_email="huzecong@gmail.com",
