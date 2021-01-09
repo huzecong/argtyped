@@ -168,6 +168,9 @@ class ArgumentsMeta(ABCMeta):
 
         # Check validity of arguments and create specs.
         for arg_name, arg_typ in annotations.items():
+            if isinstance(arg_typ, str):
+                type_error("forward references are not yet supported")
+
             has_default = arg_name in namespace
             default_val = namespace.get(arg_name, None)
 

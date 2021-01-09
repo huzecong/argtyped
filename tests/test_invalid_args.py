@@ -88,7 +88,7 @@ def test_invalid_nesting():
         class Args5(Arguments):
             a: List[Optional[List[int]]]
 
-    with pytest.raises(TypeError, match="'Union' .*not supported"):
+    with pytest.raises(TypeError, match=r"'Union'.*not supported"):
 
         class Args6(Arguments):
             a: Optional[Union[int, float]]
@@ -110,7 +110,7 @@ def test_invalid_type():
         class Args1(Arguments):
             a: 5 = 0
 
-    with pytest.raises(TypeError, match="invalid type"):
+    with pytest.raises(TypeError, match=r"forward reference.*not.*supported"):
 
         class Args2(Arguments):
             b: "str" = 1
