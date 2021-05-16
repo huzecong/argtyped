@@ -24,8 +24,8 @@ class UnderscoreArgs(Arguments, underscore=True):
 
 class DerivedArgs(BaseArgs, UnderscoreArgs):
     e: float
-    b: Literal["a", "b", "c"] = "b"
-    c: MyEnum  # override base argument w/ default
+    b: Literal["a", "b", "c"] = "b"  # type: ignore
+    c: MyEnum  # type: ignore  # override base argument w/ default
 
 
 class FinalArgs(DerivedArgs, underscore=True):
