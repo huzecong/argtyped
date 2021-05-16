@@ -28,6 +28,16 @@ class DerivedArgs(BaseArgs, UnderscoreArgs):
     c: MyEnum  # override base argument w/ default
 
 
+class FinalArgs(DerivedArgs, underscore=True):
+    final_arg: str
+
+
+def test_underscore_inheritance():
+    underscore_args = {"underscore_arg", "underscore_switch", "final_arg"}
+    for name, spec in argument_specs(FinalArgs).items():
+        assert spec.underscore == (name in underscore_args)
+
+
 def test_argument_specs():
     base_specs = {
         "a": ArgumentSpec(type="normal", nullable=False, required=True, value_type=int),

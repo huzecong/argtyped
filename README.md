@@ -239,6 +239,59 @@ To summarize, whatever works for `argparse` works here. The following types are 
 - Any other type that takes a single `str` as `__init__` parameters. It is also theoretically possible to use a function
   that takes an `str` as input, but it's not recommended as it's not type-safe.
   
+## Composing `Arguments` Classes
+
+You can split your arguments into separate `Arguments` classes and then compose them together by inheritance. A subclass
+will have the union of all arguments in its base classes. If the subclass contains an argument with the same name as an
+argument in a base class, then the subclass definition takes precedence. For example:
+
+```python
+class BaseArgs(Arguments):
+    a: int = 1
+    b: Switch = True
+
+class DerivedArgs(BaseArgs):
+    b: str
+
+# args = DerivedArgs([])  # bad; `b` is required
+args = DerivedArgs(["--b=1234"])
+```
+
+**Caveat:** For simplicity, we do not completely follow the [C3 linearization algorithm](
+https://en.wikipedia.org/wiki/C3_linearization) that determines the class MRO in Python. Thus, it is a bad idea to have
+overridden arguments in cases where there's diamond inheritance.
+
+If you don't understand the above, that's fine. Just note that generally, it's a bad idea to have too complicated
+inheritance relationships with overridden arguments.
+
+## Argument Naming Styles
+
+By default `argtyped` uses `--kebab-case` (with hyphens connecting words), which is the convention for UNIX command line
+tools. However, many existing tools use the awkward `--snake_case` (with underscores connecting words), and sometimes
+consistency is preferred over aesthetics. If you want to use underscores, you can do so by setting `underscore=True`
+inside the parentheses where you specify base classes, like this:
+
+```python
+class UnderscoreArgs(Arguments, underscore=True):
+    underscore_arg: int
+    underscore_switch: Switch = True
+
+args = UnderscoreArgs(["--underscore_arg", "1", "--no_underscore_switch"])
+```
+
+The underscore settings only affect arguments defined in the class scope; (non-overridden) inherited arguments are not
+affects. Thus, you can mix-and-match `snake_case` and `kebab-case` arguments:
+
+```python
+class MyArgs(UnderscoreArgs):
+    kebab_arg: str
+
+class MyFinalArgs(MyArgs, underscore=True):
+    new_underscore_arg: float
+
+args = MyArgs(["--underscore_arg", "1", "--kebab-arg", "kebab", "--new_underscore_arg", "1.0"])
+```
+
 ## Notes
 
 - Advanced `argparse` features such as subparsers, groups, argument lists, and custom actions are not supported.
