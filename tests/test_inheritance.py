@@ -17,7 +17,12 @@ class BaseArgs(Arguments):
     d: Switch = False
 
 
-class DerivedArgs(BaseArgs):
+class UnderscoreArgs(Arguments, underscore=True):
+    underscore_arg: int
+    underscore_switch: Switch = True
+
+
+class DerivedArgs(BaseArgs, UnderscoreArgs):
     e: float
     b: Literal["a", "b", "c"] = "b"
     c: MyEnum  # override base argument w/ default
@@ -40,8 +45,26 @@ def test_argument_specs():
             default=False,
         ),
     }
+    underscore_specs = {
+        "underscore_arg": ArgumentSpec(
+            type="normal",
+            nullable=False,
+            required=True,
+            value_type=int,
+            underscore=True,
+        ),
+        "underscore_switch": ArgumentSpec(
+            type="switch",
+            nullable=False,
+            required=False,
+            value_type=bool,
+            default=True,
+            underscore=True,
+        ),
+    }
     derived_specs = {
         **base_specs,
+        **underscore_specs,
         "b": ArgumentSpec(
             type="normal",
             nullable=False,
@@ -63,3 +86,8 @@ def test_argument_specs():
     }
     assert dict(argument_specs(BaseArgs)) == base_specs
     assert dict(argument_specs(DerivedArgs)) == derived_specs
+
+    # Test parsing
+    _ = DerivedArgs(
+        "--a 1 --e 1.0 --c a --underscore_arg 1 --no_underscore_switch".split()
+    )

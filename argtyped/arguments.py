@@ -65,7 +65,9 @@ class ArgumentParser(argparse.ArgumentParser):
         sys.stderr.write(f"{self.prog}: error: {message}\n")
         self.exit(2)
 
-    def add_switch_argument(self, name: str, default: bool = False) -> None:
+    def add_switch_argument(
+        self, name: str, default: bool = False, underscore: bool = False
+    ) -> None:
         r"""
         Add a "switch" argument to the parser. A switch argument with name ``"flag"``
         has value ``True`` if the argument ``--flag`` exists, and ``False`` if
@@ -77,7 +79,8 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument(
             f"--{name}", action="store_true", default=default, dest=var_name
         )
-        self.add_argument(f"--no-{name}", action="store_false", dest=var_name)
+        off_arg_name = f"--no_{name}" if underscore else f"--no-{name}"
+        self.add_argument(off_arg_name, action="store_false", dest=var_name)
 
 
 def _bool_conversion_fn(s: str) -> bool:
@@ -112,6 +115,7 @@ class ArgumentSpec(NamedTuple):  # pylint: disable=inherit-non-class
     type: str  # Literal["normal", "switch", "sequence"]
     choices: Optional[Tuple[Any, ...]] = None
     default: Optional[Any] = None
+    underscore: bool = False  # True for `--snake_case` args, False for `--kebab-case`
 
 
 class ArgumentsMeta(ABCMeta):
@@ -167,6 +171,7 @@ class ArgumentsMeta(ABCMeta):
             )
 
         # Check validity of arguments and create specs.
+        underscore = kwargs.get("underscore", False)
         for arg_name, arg_typ in annotations.items():
             if isinstance(arg_typ, str):
                 type_error("forward references are not yet supported")
@@ -214,6 +219,7 @@ class ArgumentsMeta(ABCMeta):
                     required=False,
                     value_type=bool,
                     default=default_val,
+                    underscore=underscore,
                 )
             else:
                 if sequence and has_default and not isinstance(default_val, list):
@@ -245,6 +251,7 @@ class ArgumentsMeta(ABCMeta):
                     value_type=value_type,
                     choices=choices,
                     default=default_val,
+                    underscore=underscore,
                 )
             arguments[arg_name] = spec
 
@@ -257,7 +264,8 @@ class ArgumentsMeta(ABCMeta):
     def build_parser(cls) -> ArgumentParser:
         parser = ArgumentParser()
         for name, spec in cls.__arguments__.items():
-            arg_name = "--" + name.replace("_", "-")
+            arg_name = name if spec.underscore else name.replace("_", "-")
+            arg_name = f"--{arg_name}"
             if spec.type in {"normal", "sequence"}:
                 arg_type = spec.value_type
                 conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
@@ -284,7 +292,7 @@ class ArgumentsMeta(ABCMeta):
                 parser.add_argument(arg_name, **kwargs)
             else:
                 assert spec.default is not None
-                parser.add_switch_argument(arg_name, spec.default)
+                parser.add_switch_argument(arg_name, spec.default, spec.underscore)
 
         if cls.__module__ != "__main__":
             # Usually arguments are defined in the same script that is directly

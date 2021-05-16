@@ -1,4 +1,5 @@
 import enum
+import warnings
 from collections.abc import Iterable as IterableType
 from typing import Any, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
@@ -24,6 +25,12 @@ T = TypeVar("T")
 
 class _Choices:
     def __new__(cls, values=None):
+        if values is not None:
+            warnings.warn(
+                "'Choices' is deprecated as of v0.3.0, and will be removed in v0.4.0. "
+                "Use 'Literal' instead",
+                DeprecationWarning,
+            )
         self = super().__new__(cls)
         self.__values__ = values
         return self
