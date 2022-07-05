@@ -34,24 +34,9 @@ def test_switch_not_bool():
 
 
 def test_invalid_choice():
-    with pytest.raises(TypeError, match=r"must contain at least one"):
+    with pytest.raises(TypeError, match=r"must be string"):
 
         class Args1(Arguments):
-            a: Choices[()]
-
-    with pytest.raises(TypeError, match=r"invalid default value"):
-
-        class Args2(Arguments):
-            a: Choices["a"] = "b"  # wrong
-
-    with pytest.raises(TypeError, match=r"must be string"):
-
-        class Args3(Arguments):
-            a: Choices["1", 2]
-
-    with pytest.raises(TypeError, match=r"must be string"):
-
-        class Args4(Arguments):
             a: Literal["1", 2]
 
 

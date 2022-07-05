@@ -1,0 +1,62 @@
+# Packaging
+
+[build-system]
+requires = ["setuptools >= 59"]
+build-backend = "setuptools.build_meta"
+# Note: `setuptools >= 61` supports having project metadata in `pyproject.toml` as well,
+# but it dropped support for Python 3.6.  To have our project buildable on Python 3.6, I
+# had to keep metadata in `setup.cfg`.
+
+# Tools - Pylint
+
+[tool.pylint.main]
+load-plugins = [
+    "pylint.extensions.bad_builtin",
+    "pylint.extensions.docstyle",
+    "pylint.extensions.set_membership",
+]
+disable = [
+    "missing-module-docstring",
+    "bad-mcs-classmethod-argument",  # I prefer `mcs` over `cls`
+    "too-many-branches",
+    "too-many-locals",
+    "too-many-statements",
+    "docstring-first-line-empty",
+]
+enable = [
+    "useless-suppression",
+]
+
+[tool.pylint.basic]
+include-naming-hint = true
+typevar-rgx = "^([A-Z]|T([A-Z][a-z])*)$"
+# snake_case, but with no lower bound on name length
+argument-rgx = "([^\\W\\dA-Z][^\\WA-Z]*|_[^\\WA-Z]*|__[^\\WA-Z\\d_][^\\WA-Z]+__)$"
+variable-rgx = "([^\\W\\dA-Z][^\\WA-Z]*|_[^\\WA-Z]*|__[^\\WA-Z\\d_][^\\WA-Z]+__)$"
+
+# Tools - Linting
+
+[tool.isort]
+profile = "black"
+
+# Tools - Mypy
+
+[tool.mypy]
+warn_unused_configs = true
+warn_redundant_casts = true
+no_implicit_optional = true
+follow_imports = "silent"
+ignore_missing_imports = true
+mypy_path = "./"
+allow_redefinition = true
+show_error_codes = true
+exclude = [
+    "build/"
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "argtyped.*",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

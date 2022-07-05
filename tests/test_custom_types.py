@@ -1,10 +1,11 @@
 import sys
-from enum import Enum as BuiltinEnum, auto
+from enum import Enum as BuiltinEnum
+from enum import auto
 from typing import List, Optional, Tuple, TypeVar, Union
 
 from typing_extensions import Literal
 
-from argtyped import Choices, Enum as ArgtypedEnum
+from argtyped import Enum as ArgtypedEnum
 from argtyped.custom_types import (
     is_choices,
     is_enum,
@@ -30,7 +31,6 @@ def test_is_enum():
     assert is_enum(A)
     assert is_enum(B)
     assert not is_enum(1234)
-    assert not is_enum(Choices)
     assert not is_enum(Optional[A])
 
 
@@ -54,19 +54,15 @@ def test_unwrap_optional():
 
 
 def test_is_choices():
-    assert is_choices(Choices["a"])
-    assert is_choices(Choices["a", "b", "c"])
-    assert is_choices(Choices[["a", "b"] + ["c"]])
     assert is_choices(Literal["a"])
     assert is_choices(Literal["a", "b", "c"])
     assert not is_choices(Union[int, float, "c"])
     assert not is_choices(Optional["a"])
+    assert not is_choices(Optional[Literal["a"]])
 
 
 def test_unwrap_choices():
-    assert unwrap_choices(Choices["a"]) == ("a",)
-    assert unwrap_choices(Choices["a", "b", "c"]) == ("a", "b", "c")
-    assert unwrap_choices(Choices[["a", "b"] + ["c"]]) == ("a", "b", "c")
+    assert unwrap_choices(Literal["a"]) == ("a",)
     assert unwrap_choices(Literal["a", "b", "c"]) == ("a", "b", "c")
 
 

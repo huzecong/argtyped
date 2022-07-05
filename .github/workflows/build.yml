@@ -7,42 +7,38 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8, 3.9]
-        has-typing-extensions: [true]
-        include:
-          - python-version: 3.6
-            has-typing-extensions: false
+        python-version: [3.6, 3.7, 3.8, 3.9, "3.10"]
 
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
+      - name: Cache pip
+        uses: actions/cache@v2
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-      - name: Install typing-extensions
-        if: matrix.has-typing-extensions
-        run: |
-          pip install typing-extensions
+          pip install .[dev]
       - name: Linting
         run: |
-          pip install pylint==2.6.0 black==20.8b1
           # stop the build if code doesn't conform to style guide
+          isort --check .
           black --check .
           # stop the build if there are Python syntax errors or undefined names
           pylint argtyped/
-      - name: Unit test
-        run: |
-          pip install pytest pytest-cov
-          # test against local non-installed version of library
-          python -m pytest --cov=argtyped/ --cov-report=xml
       - name: Typecheck
         run: |
-          # installing mypy also installs typing-extensions, so type check after unit test
-          pip install mypy==0.812
           mypy .
+      - name: Unit test
+        run: |
+          # test against local non-installed version of library
+          python -m pytest --cov=argtyped/ --cov-report=xml
       - name: Codecov
         uses: codecov/codecov-action@v1.0.5
         with:

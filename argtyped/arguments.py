@@ -10,6 +10,7 @@ from typing import (
     Dict,
     List,
     NamedTuple,
+    NoReturn,
     Optional,
     Tuple,
     Type,
@@ -17,15 +18,15 @@ from typing import (
     Union,
 )
 
-from .custom_types import (
+from argtyped.custom_types import (
     Switch,
     is_choices,
     is_enum,
     is_list,
     is_optional,
-    unwrap_optional,
-    unwrap_list,
     unwrap_choices,
+    unwrap_list,
+    unwrap_optional,
 )
 
 __all__ = [
@@ -39,9 +40,9 @@ ConversionFn = Callable[[str], T]
 
 
 class ArgumentParser(argparse.ArgumentParser):
-    r""" A class to override some of ``ArgumentParser``\ 's behaviors. """
+    r"""A class to override some of ``ArgumentParser``\ 's behaviors."""
 
-    def _get_value(self, action, arg_string):
+    def _get_value(self, action: argparse.Action, arg_string: str) -> Any:
         r"""
         The original ``_get_value`` method catches exceptions in user-defined
         ``type_func``\ s and ignores the error message. Here we don't do that.
@@ -56,7 +57,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
         return result
 
-    def error(self, message):
+    def error(self, message: str) -> NoReturn:
         r"""
         The original ``error`` method only prints the usage and force quits. Here we
         print the full help.
@@ -106,9 +107,9 @@ _TYPE_CONVERSION_FN: Dict[type, ConversionFn[Any]] = {
 }
 
 
-class ArgumentSpec(NamedTuple):  # pylint: disable=inherit-non-class
-    # NOTE: pylint raises false-positive error only on Python 3.9. This will likely be
-    #  fixed in the next release (2.6.1).
+class ArgumentSpec(NamedTuple):
+    """Internal specs of an argument."""
+
     nullable: bool
     required: bool
     value_type: type
@@ -126,15 +127,23 @@ class ArgumentsMeta(ABCMeta):
     __parser__: Optional[ArgumentParser]
     __arguments__: "OrderedDict[str, ArgumentSpec]"
 
-    def __new__(mcs, name, bases, namespace, **kwargs):
-        cls: "Type[Arguments]" = super().__new__(mcs, name, bases, namespace)
+    def __new__(  # type: ignore[misc]
+        mcs,
+        name: str,
+        bases: Tuple[type, ...],
+        namespace: Dict[str, Any],
+        **kwargs: Any,
+    ) -> "Type[Arguments]":
+        cls: "Type[Arguments]" = super().__new__(  # type: ignore[assignment]
+            mcs, name, bases, namespace
+        )
 
         root = kwargs.get("_root", False)
         if not root and not issubclass(cls, Arguments):
             raise TypeError(f"Type {cls.__name__!r} must inherit from `Arguments`")
         if root:
             cls.__parser__ = None
-            cls.__arguments__ = {}
+            cls.__arguments__ = OrderedDict()
             return cls
 
         arguments: "OrderedDict[str, ArgumentSpec]" = OrderedDict()
@@ -157,14 +166,12 @@ class ArgumentsMeta(ABCMeta):
                     raise TypeError(f"Argument {key!r} does not have type annotation")
 
         def type_error(message: str) -> None:
-            # pylint: disable=undefined-loop-variable
             raise TypeError(
                 f"Argument {arg_name!r} has invalid type {annotations[arg_name]!r}: "
                 + message
             )
 
         def value_error(message: str) -> None:
-            # pylint: disable=undefined-loop-variable
             raise TypeError(
                 f"Argument {arg_name!r} has invalid default value {default_val!r}: "
                 + message
@@ -183,7 +190,7 @@ class ArgumentsMeta(ABCMeta):
             # - Nested lists (e.g. `List[List[T]]`) are not supported.
             # - When mixing `List` and `Optional`, the only allowed variant is
             #   `List[Optional[T]]`. Anything else (`Optional[List[T]]`,
-            #   `Optional[List[Optional[T]]]`) are invalid.
+            #   `Optional[List[Optional[T]]]`) is invalid.
             sequence = is_list(arg_typ)
             if sequence:
                 arg_typ = unwrap_list(arg_typ)
@@ -224,6 +231,7 @@ class ArgumentsMeta(ABCMeta):
             else:
                 if sequence and has_default and not isinstance(default_val, list):
                     value_error("Default for list argument must be of list type")
+                choices = None
                 if is_enum(arg_typ) or is_choices(arg_typ):
                     if is_enum(arg_typ):
                         value_type = arg_typ
@@ -243,7 +251,6 @@ class ArgumentsMeta(ABCMeta):
                     if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
                         type_error("Unsupported type")
                     value_type = arg_typ
-                    choices = None
                 spec = ArgumentSpec(
                     type="sequence" if sequence else "normal",
                     nullable=nullable,
@@ -262,6 +269,7 @@ class ArgumentsMeta(ABCMeta):
         return cls
 
     def build_parser(cls) -> ArgumentParser:
+        """Create the :class:`ArgumentParser` for this :class:`Arguments` class."""
         parser = ArgumentParser()
         for name, spec in cls.__arguments__.items():
             arg_name = name if spec.underscore else name.replace("_", "-")

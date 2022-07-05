@@ -34,8 +34,7 @@ class LoggingLevels(enum.Enum):
 class MyArguments(Arguments):
     model_name: str
     hidden_size: int = 512
-    activation: Choices["relu", "tanh", "sigmoid"] = "relu"
-    activation2: Literal["relu", "tanh", "sigmoid"] = "tanh"
+    activation: Literal["relu", "tanh", "sigmoid"] = "relu"
     logging_level: MyLoggingLevels = MyLoggingLevels.Info
     use_dropout: Switch = True
     dropout_prob: Optional[float] = 0.5
@@ -48,7 +47,6 @@ class MyArguments(Arguments):
 CMD = r"""
     --model-name LSTM
     --activation sigmoid
-    --activation2=sigmoid
     --logging-level=debug
     --no-use-dropout
     --dropout-prob none
@@ -62,7 +60,6 @@ RESULT = dict(
     model_name="LSTM",
     hidden_size=512,
     activation="sigmoid",
-    activation2="sigmoid",
     logging_level=MyLoggingLevels.Debug,
     use_dropout=False,
     dropout_prob=None,
@@ -79,9 +76,6 @@ def test_parse():
     parser.add_argument("--hidden-size", type=int, default=512)
     parser.add_argument(
         "--activation", choices=["relu", "tanh", "sigmoid"], default="relu"
-    )
-    parser.add_argument(
-        "--activation2", choices=["relu", "tanh", "sigmoid"], default="tanh"
     )
     parser.add_argument(
         "--logging-level",

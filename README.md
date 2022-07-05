@@ -169,29 +169,23 @@ To summarize, whatever works for `argparse` works here. The following types are 
 - **Built-in types** such as `int`, `float`, `str`.
 - **Boolean type** `bool`. Accepted values (case-insensitive) for `True` are: `y`, `yes`, `true`, `ok`; accepted values
   for `False` are: `n`, `no`, `false`.
-- **Choice types** `Literal[...]` or `Choices[...]`. A choice argument is essentially an `str` argument with limited
+- **Choice types** `Literal[...]`. A choice argument is essentially an `str` argument with limited
   choice of values. The ellipses can be filled with a tuple of `str`s, or an expression that evaluates to a list of
   `str`s:
   ```python
-  from argtyped import Arguments, Choices
-  from typing import List
+  from argtyped import Arguments
   from typing_extensions import Literal
-
-  def logging_levels() -> List[str]:
-      return ["debug", "info", "warning", "error"]
 
   class MyArgs(Arguments):
       foo: Literal["debug", "info", "warning", "error"]  # 4 choices
-      bar: Choices[logging_levels()]                     # the same 4 choices
 
-  # argv: ["--foo=debug", "--bar=info"] => foo="debug", bar="info"
+  # argv: ["--foo=debug"] => foo="debug"
   ```
   This is equivalent to the `choices` keyword in `argparse.add_argument`.
   
   **Note:** The choice type was previously named `Choices`. This is deprecated in favor of the
   [`Literal` type](https://mypy.readthedocs.io/en/stable/literal_types.html) introduced in Python 3.8 and back-ported to
-  3.6 and 3.7 in the `typing_extensions` library. Please see [Notes](#notes) for a discussing on the differences
-  between the two.
+  3.6 and 3.7 in the `typing_extensions` library. `Choices` was removed since version 0.4.0.
 - **Enum types** derived from `enum.Enum`. It is recommended to use `argtyped.Enum` which uses the instance names as
   values:
   ```python
@@ -298,15 +292,14 @@ args = MyArgs(["--underscore_arg", "1", "--kebab-arg", "kebab", "--new_underscor
 - Using switch arguments may result in name clashes: if a switch argument has name `arg`, there can be no argument with
   the name `no_arg`.
 - Optional types:
-  - `Optional` can be used with `Literal`, but cannot be used with `Choices`:
+  - `Optional` can be used with `Literal`:
     ```python
-    from argtyped import Arguments, Choices
+    from argtyped import Arguments
     from typing import Literal, Optional
     
     class MyArgs(Arguments):
         foo: Optional[Literal["a", "b"]]  # valid
-        bar: Optional[Choices["a", "b"]]  # invalid
-        baz: Choices["a", "b", "none"]    # not elegant but it works
+        bar: Literal["a", "b", "none"]    # also works but is less obvious
     ```
   - `Optional[str]` would parse a value of `"none"` (case-insensitive) into `None`.
 - List types:
@@ -322,19 +315,6 @@ args = MyArgs(["--underscore_arg", "1", "--kebab-arg", "kebab", "--new_underscor
     ```
   - List types cannot be nested inside a list or an optional type. Types such as `Optional[List[int]]` and
     `List[List[int]]` are not accepted.
-- `Choices` vs `Literal`:
-  - `Choices` is deprecated. In general, you should prefer `Literal` to `Choices`.
-  - When all choices are defined as string literals, the two types are interchangeable.
-  - Pros for `Choices`:
-    - The `Choices` parameter can be an expression that evaluate to an iterable of strings, while `Literal` only
-      supports string literals as parameters.
-    - `Literal` requires installing the `typing_extensions` package in Python versions prior to 3.8. This package is
-      not listed as a prerequisite of `argtyped` so you must manually install it.
-  - Pros for `Literal`:
-    - `Literal` is a built-in type supported by type-checkers and IDEs. You can get better type inference with
-      `Literal`, and the IDE won't warn you that your choices are "undefined" (because it interprets the string literals
-      as forward references).
-    - `Literal` can be combined with `Optional`.
 
 ## Under the Hood
 
@@ -354,6 +334,6 @@ This is what happens under the hood:
 
 - [ ] Support `action="append"` or `action="extend"` for `List[T]` types.
   - Technically this is not a problem, but there's no elegant way to configure whether this behavior is desired.
-- [ ] Throw (suppressable) warnings on using non-type callables as types.
+- [ ] Throw (suppressible) warnings on using non-type callables as types.
 - [ ] Support converting an `attrs` class into `Arguments`.
 - [ ] Support forward references in type annotations.

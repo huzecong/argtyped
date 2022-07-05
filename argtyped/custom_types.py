@@ -1,10 +1,9 @@
 import enum
-import warnings
-from collections.abc import Iterable as IterableType
-from typing import Any, Iterable, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, List, Optional, Tuple, Type, TypeVar, Union
+
+import typing_inspect
 
 __all__ = [
-    "Choices",
     "Enum",
     "auto",  # also export auto for convenience
     "Switch",
@@ -17,45 +16,39 @@ __all__ = [
     "unwrap_optional",
 ]
 
-auto = enum.auto
+auto = enum.auto  # pylint: disable=invalid-name
 
 NoneType = type(None)
 T = TypeVar("T")
 
 
-class _Choices:
-    def __new__(cls, values=None):
-        if values is not None:
-            warnings.warn(
-                "'Choices' is deprecated as of v0.3.0, and will be removed in v0.4.0. "
-                "Use 'Literal' instead",
-                DeprecationWarning,
-            )
-        self = super().__new__(cls)
-        self.__values__ = values
-        return self
-
-    def __getitem__(self, values: Union[str, Iterable[str]]):
-        if isinstance(values, IterableType) and not isinstance(values, str):
-            parsed_values = tuple(values)
-        else:
-            parsed_values = (values,)
-        if len(parsed_values) == 0:
-            raise TypeError("Choices must contain at least one element")
-        return self.__class__(parsed_values)
-
-
-Choices: Any = _Choices()
-
-
 class Enum(enum.Enum):
-    # pylint: disable=no-self-argument, unused-argument
-    def _generate_next_value_(name, start, count, last_values):
+    """
+    A subclass of the builtin :class:`enum.Enum` class, but uses the lower-cased names
+    as enum values when used with ``auto()``.  For example::
+
+        from argtyped import Enum, auto
+
+        class MyEnum(Enum):
+            OPTION_A = auto()
+            OPTION_B = auto()
+
+    is equivalent to::
+
+        from enum import Enum
+
+        class MyEnum(Enum):
+            OPTION_A = "option_a"
+            OPTION_B = "option_b"
+    """
+
+    @staticmethod
+    def _generate_next_value_(
+        name: str, start: int, count: int, last_values: List[str]
+    ) -> str:
         return name.lower()
 
-    # pylint: enable=no-self-argument, unused-argument
-
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         return self.value == other or super().__eq__(other)
 
 
@@ -67,66 +60,28 @@ class Enum(enum.Enum):
 #    >> Switch = Union[bool]
 # 3. `NewType` forbids implicit casts from `bool`.
 #    >> Switch = NewType('Switch', bool)
-__dummy_type__ = type(
-    "__dummy_type__", (), {}
-)  # the names must match for pickle to work
+__dummy_type__ = type(  # pylint: disable=invalid-name
+    "__dummy_type__", (), {}  # names must match for pickle to work
+)
 Switch = Union[bool, __dummy_type__]  # type: ignore[valid-type]
 
-HAS_LITERAL = False
-_Literal = None
-try:
-    from typing import Literal  # type: ignore
 
-    HAS_LITERAL = True
-except ImportError:
-    try:
-        from typing_extensions import Literal  # type: ignore
-
-        try:
-            # Compatible with Python 3.6
-            from typing_extensions import _Literal  # type: ignore
-        except ImportError:
-            pass
-
-        HAS_LITERAL = True
-    except ImportError:
-        pass
-
-if HAS_LITERAL:
-
-    def is_choices(typ: type) -> bool:
-        r"""
-        Check whether a type is a choices type (:class:`Choices` or :class:`Literal`).
-        This cannot be checked using traditional methods,  since :class:`Choices` is a
-        metaclass.
-        """
-        return (
-            isinstance(typ, _Choices)
-            or getattr(typ, "__origin__", None) is Literal
-            or type(typ) is _Literal  # pylint: disable=unidiomatic-typecheck
-        )
-
-    def unwrap_choices(typ: type) -> Tuple[str, ...]:
-        r"""
-        Return the string literals associated with the choices type. Literal type in
-        Python 3.7+ stores the literals in ``typ.__args__``, but in Python 3.6- it's in
-        ``typ.__values__``.
-        """
-        return typ.__values__ if hasattr(typ, "__values__") else typ.__args__  # type: ignore[attr-defined]
+def is_choices(typ: type) -> bool:
+    r"""
+    Check whether a type is a choices type (:class:`Choices` or :class:`Literal`).
+    This cannot be checked using traditional methods,  since :class:`Choices` is a
+    metaclass.
+    """
+    return typing_inspect.is_literal_type(typ)
 
 
-else:
-
-    def is_choices(typ: type) -> bool:
-        r"""
-        Check whether a type is a choices type (:class:`Choices`). This cannot be
-        checked using traditional methods, since :class:`Choices` is a metaclass.
-        """
-        return isinstance(typ, _Choices)
-
-    def unwrap_choices(typ: type) -> Tuple[str, ...]:
-        r""" Return the string literals associated with the choices type. """
-        return typ.__values__  # type: ignore[attr-defined]
+def unwrap_choices(typ: type) -> Tuple[str, ...]:
+    r"""
+    Return the string literals associated with the choices type. Literal type in
+    Python 3.7+ stores the literals in ``typ.__args__``, but in Python 3.6- it's in
+    ``typ.__values__``.
+    """
+    return typing_inspect.get_args(typ, evaluate=True)
 
 
 def is_enum(typ: Any) -> bool:
@@ -142,27 +97,30 @@ def is_optional(typ: type) -> bool:
     Check whether a type is `Optional[T]`. `Optional` is internally implemented as
     `Union` with `type(None)`.
     """
-    return getattr(typ, "__origin__", None) is Union and NoneType in getattr(
-        typ, "__args__", ()
-    )
+    return typing_inspect.is_optional_type(typ)
 
 
 def is_list(typ: type) -> bool:
-    return (
-        getattr(typ, "__origin__", None) is list or getattr(typ, "_gorg", None) is List
-    )
+    r"""Check whether a type if `List[T]`."""
+    # Note: The origin is `List` in Python 3.6, and `list` in Python 3.7+.
+    return typing_inspect.get_origin(typ) in (list, List)
 
 
 def unwrap_optional(typ: Type[Optional[T]]) -> Type[T]:
-    r""" Return the inner type inside an `Optional[T]` type. """
-    remain_types = [t for t in typ.__args__ if t is not NoneType]  # type: ignore[union-attr]
+    r"""Return the inner type inside an `Optional[T]` type."""
+    # Note: In Python 3.6, `get_args` returns a tuple if `evaluate` is not set to True,
+    # due to it having a different internal representation.  For compatibility, we need
+    # to always set `evaluate` to True.
+    remain_types = [
+        t for t in typing_inspect.get_args(typ, evaluate=True) if t is not NoneType
+    ]
     if len(remain_types) >= 2:
-        if set(remain_types) == set(Switch.__args__):  # type: ignore[attr-defined]
+        if set(remain_types) == set(typing_inspect.get_args(Switch, evaluate=True)):
             return Switch  # type: ignore[return-value]
         raise TypeError(f"Invalid type {typ}: 'Union' types are not supported")
     return remain_types[0]
 
 
 def unwrap_list(typ: Type[List[T]]) -> Type[T]:
-    r""" Return the inner type inside an `List[T]` type. """
-    return typ.__args__[0]  # type: ignore[attr-defined]
+    r"""Return the inner type inside an `List[T]` type."""
+    return typing_inspect.get_args(typ, evaluate=True)[0]
