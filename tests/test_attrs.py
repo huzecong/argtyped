@@ -50,18 +50,22 @@ def test_attrs_positional_arguments():
 
 
 def test_attrs_custom_argparse_options(catch_parse_error):
+    def _convert_c(xss: List[List[str]]) -> List[int]:
+        # In Python 3.8+ we'd just set `action="extend"`.
+        return [int(x) for xs in xss for x in xs]
+
     @attr.s
     class CustomOptionArgs(AttrsArguments):
         a: List[int] = positional_arg(metadata={"nargs": "+"})
         b: List[int] = attr.ib()
-        c: List[int] = attr.ib(metadata={"action": "extend"})
+        c: List[int] = attr.ib(metadata={"action": "append"}, converter=_convert_c)
 
     with catch_parse_error():
         _ = CustomOptionArgs.parse_args("--b --c".split())
     args = CustomOptionArgs.parse_args("1 2 --b --c".split())
-    assert args == CustomOptionArgs(a=[1, 2], b=[], c=[])
+    assert attr.asdict(args) == {"a": [1, 2], "b": [], "c": []}
 
     with catch_parse_error():
         _ = CustomOptionArgs.parse_args("1 --b 1 2 --b 3 4".split())
     args = CustomOptionArgs.parse_args("1 --c 1 2 --c 3 --b 1 2 --c 4 5".split())
-    assert args == CustomOptionArgs(a=[1], b=[1, 2], c=[1, 2, 3, 4, 5])
+    assert attr.asdict(args) == {"a": [1], "b": [1, 2], "c": [1, 2, 3, 4, 5]}
