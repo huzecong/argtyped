@@ -3,7 +3,8 @@ from typing import List, Optional, Union
 import pytest
 from typing_extensions import Literal
 
-from argtyped import *
+from argtyped.arguments import Arguments
+from argtyped.custom_types import Enum, Switch, auto
 
 
 def test_no_type_annotation():

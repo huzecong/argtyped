@@ -117,7 +117,7 @@ class ArgumentKind(enum.Enum):
     - ``SWITCH``: A boolean switch argument that takes no values; it is set to True with
       ``--argument`` and False with ``--no-argument``
       (``action="store_true"/"store_false"``).
-    - ``SEQUENCE``: A sequential argument that takes multiple values (``nargs="+"``).
+    - ``SEQUENCE``: A sequential argument that takes multiple values (``nargs="*"``).
     """
 
     NORMAL = 0
@@ -125,18 +125,207 @@ class ArgumentKind(enum.Enum):
     SEQUENCE = 2
 
 
-class ArgumentSpec(NamedTuple):
-    """Internal specs of an argument."""
+_NOTHING = object()  # sentinel
 
+
+class ArgumentSpec(NamedTuple):
+    """
+    Internal specs of an argument.
+
+    This class is internal -- there's no stability guarantees on its attributes across
+    versions.
+    """
+
+    name: str
     nullable: bool
     required: bool
     type: type
     kind: ArgumentKind
     choices: Optional[Tuple[Any, ...]] = None
-    default: Optional[Any] = None
-    underscore: bool = False  # True for `--snake_case` args, False for `--kebab-case`
-    # True if argument was defined in a base class and not overridden in current class.
+    default: Any = _NOTHING
+
+    positional: bool = False
+    # ^ Whether the argument is a positional argument.  If False, it is a keyword(-only)
+    #   argument.
+    argparse_options: Optional[Dict[str, Any]] = None
+    # ^ Additional arguments to pass to `ArgumentParser.add_argument`.  This takes
+    #   precedence over `argtyped`'s computed options, e.g. you can set `nargs="+"` for
+    #   sequence-type arguments.
+    parse: bool = True
+    # ^ Whether the argument value should be parsed.  If False, it is the downstream's
+    #   responsibility to parse (e.g. in `attrs`).
+    underscore: bool = False
+    # ^ Argument naming convention:
+    #   True for `--snake_case` args, False for `--kebab-case` (default).
     inherited: bool = False
+    # ^ True if argument was defined in a base class and is not overridden in the
+    #   current class.
+
+    def with_options(self, positional: bool = False, **kwargs: Any) -> "ArgumentSpec":
+        """Return a new spec with additional ``argparse`` options."""
+        return self._replace(  # pylint: disable=no-member
+            positional=positional, argparse_options=kwargs or None
+        )
+
+    def with_default(self, value: Optional[Any]) -> "ArgumentSpec":
+        """
+        Return a new spec with a default value, and perform validation on the value.
+
+        By default, we don't store default values on the spec.  This is because default
+        value handling could happen outside ``argtyped``, e.g. for
+        :class:`AttrsArguments` it is handled by ``attrs``.
+        """
+
+        def value_error(message: str) -> NoReturn:
+            raise TypeError(
+                f"Argument {self.name!r} has invalid default value {value!r}: {message}"
+            )
+
+        if not self.nullable and value is None:
+            value_error(
+                "Argument not nullable. Change type annotation to 'Optional[...]' "
+                "to allow values of None"
+            )
+        if self.kind == ArgumentKind.SWITCH:
+            if not isinstance(value, bool):
+                value_error("Switch argument must have a boolean default value")
+        if self.kind == ArgumentKind.SEQUENCE:
+            if not isinstance(value, list):
+                value_error("Default for list argument must be of list type")
+            value_seq = value
+        else:
+            value_seq = [value]
+        if self.choices is not None:
+            if not all(
+                x in self.choices  # pylint: disable=unsupported-membership-test
+                or (x is None and self.nullable)
+                for x in value_seq
+            ):
+                value_error("Value must be among valid choices")
+
+        return self._replace(default=value, required=False)  # pylint: disable=no-member
+
+
+def _generate_argument_spec(
+    arg_name: str,
+    arg_type: Any,
+    has_default: bool,
+    *,
+    underscore: bool = False,
+) -> ArgumentSpec:
+    original_type = arg_type
+
+    def type_error(message: str) -> None:
+        raise TypeError(
+            f"Argument {arg_name!r} has invalid type {original_type!r}: {message}"
+        )
+
+    if isinstance(arg_type, str):
+        type_error("forward references are not yet supported")
+
+    # On sequence and nullable types:
+    # - Nested lists (e.g. `List[List[T]]`) are not supported.
+    # - When mixing `List` and `Optional`, the only allowed variant is
+    #   `List[Optional[T]]`. Anything else (`Optional[List[T]]`,
+    #   `Optional[List[Optional[T]]]`) is invalid.
+    sequence = is_list(arg_type)
+    if sequence:
+        arg_type = unwrap_list(arg_type)
+    nullable = is_optional(arg_type)
+    if nullable:
+        arg_type = unwrap_optional(arg_type)
+    if (sequence or nullable) and (arg_type is Switch or is_list(arg_type)):
+        type_error(
+            f"{'List' if is_list(arg_type) else 'Switch'!r} cannot be "
+            f"nested inside {'List' if sequence else 'Optional'!r}",
+        )
+
+    if arg_type is Switch:
+        return ArgumentSpec(
+            name=arg_name,
+            kind=ArgumentKind.SWITCH,
+            required=False,
+            nullable=False,
+            type=bool,
+            underscore=underscore,
+        )
+
+    choices = None
+    if is_enum(arg_type) or is_choices(arg_type):
+        if is_enum(arg_type):
+            value_type = arg_type
+            choices = tuple(arg_type)
+        else:
+            value_type = str
+            choices = unwrap_choices(arg_type)
+            if any(not isinstance(choice, str) for choice in choices):
+                type_error("All choices must be strings")
+    else:
+        if arg_type not in _TYPE_CONVERSION_FN and not callable(arg_type):
+            type_error("Unsupported type")
+        value_type = arg_type
+    return ArgumentSpec(
+        name=arg_name,
+        kind=ArgumentKind.SEQUENCE if sequence else ArgumentKind.NORMAL,
+        required=not has_default,
+        nullable=nullable,
+        type=value_type,
+        choices=choices,
+        underscore=underscore,
+    )
+
+
+def _build_parser(
+    arguments: "OrderedDict[str, ArgumentSpec]", cls: type
+) -> ArgumentParser:
+    """Create the :class:`ArgumentParser` for this :class:`Arguments` class."""
+    parser = ArgumentParser()
+    for name, spec in arguments.items():
+        arg_name = name if spec.underscore else name.replace("_", "-")
+        if not spec.positional:
+            arg_name = f"--{arg_name}"
+        if spec.kind in {ArgumentKind.NORMAL, ArgumentKind.SEQUENCE}:
+            arg_type = spec.type
+            kwargs: Dict[str, Any] = {}
+            if spec.positional:
+                if not spec.required:
+                    kwargs["nargs"] = "?"
+                    kwargs["default"] = spec.default
+            else:
+                if spec.required:
+                    kwargs["required"] = True
+                else:
+                    kwargs["default"] = spec.default
+            if spec.parse:
+                conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
+                if spec.nullable:
+                    conversion_fn = _optional_wrapper_fn(conversion_fn)
+                kwargs["type"] = conversion_fn
+            if spec.choices is not None:
+                if spec.nullable:
+                    kwargs["choices"] = spec.choices + (None,)
+                else:
+                    kwargs["choices"] = spec.choices
+                if is_enum(spec.type):
+                    # Display only the enum names in help.
+                    kwargs["metavar"] = (
+                        "{" + ",".join(val.name for val in spec.choices) + "}"
+                    )
+            if spec.kind == ArgumentKind.SEQUENCE:
+                kwargs["nargs"] = "*"
+            if spec.argparse_options is not None:
+                kwargs.update(spec.argparse_options)
+            parser.add_argument(arg_name, **kwargs)
+        else:
+            assert spec.default is not None
+            parser.add_switch_argument(arg_name, spec.default, spec.underscore)
+
+    if cls.__module__ != "__main__":
+        # Usually arguments are defined in the same script that is directly
+        # run (__main__). If this is not the case, add a note in help message
+        # indicating where the arguments are defined.
+        parser.epilog = f"Note: Arguments defined in {cls.__module__}.{cls.__name__}"
+    return parser
 
 
 class ArgumentsMeta(ABCMeta):
@@ -190,150 +379,23 @@ class ArgumentsMeta(ABCMeta):
                 if key not in annotations and key not in arguments:
                     raise TypeError(f"Argument {key!r} does not have type annotation")
 
-        def type_error(message: str) -> None:
-            raise TypeError(
-                f"Argument {arg_name!r} has invalid type {annotations[arg_name]!r}: "
-                + message
-            )
-
-        def value_error(message: str) -> None:
-            raise TypeError(
-                f"Argument {arg_name!r} has invalid default value {default_val!r}: "
-                + message
-            )
-
         # Check validity of arguments and create specs.
         underscore = kwargs.get("underscore", False)
-        for arg_name, arg_typ in annotations.items():
-            if isinstance(arg_typ, str):
-                type_error("forward references are not yet supported")
-
+        for arg_name, arg_type in annotations.items():
             has_default = arg_name in namespace
-            default_val = namespace.get(arg_name, None)
-
-            # On sequence and nullable types:
-            # - Nested lists (e.g. `List[List[T]]`) are not supported.
-            # - When mixing `List` and `Optional`, the only allowed variant is
-            #   `List[Optional[T]]`. Anything else (`Optional[List[T]]`,
-            #   `Optional[List[Optional[T]]]`) is invalid.
-            sequence = is_list(arg_typ)
-            if sequence:
-                arg_typ = unwrap_list(arg_typ)
-            nullable = is_optional(arg_typ)
-            if nullable:
-                arg_typ = unwrap_optional(arg_typ)
-            if (sequence or nullable) and (arg_typ is Switch or is_list(arg_typ)):
-                type_error(
-                    f"{'List' if is_list(arg_typ) else 'Switch'!r} cannot be "
-                    f"nested inside {'List' if sequence else 'Optional'!r}",
-                )
-
-            required = False
-            if not has_default:
-                if nullable and not sequence:
-                    has_default = True
-                    default_val = None
-                elif not nullable:
-                    required = True
-
-            if not nullable and has_default and default_val is None:
-                value_error(
-                    "Argument not nullable. Change type annotation to 'Optional[...]' "
-                    "to allow values of None"
-                )
-
-            if arg_typ is Switch:
-                if not isinstance(default_val, bool):
-                    value_error("Switch argument must have a boolean default value")
-                spec = ArgumentSpec(
-                    kind=ArgumentKind.SWITCH,
-                    nullable=False,
-                    required=False,
-                    type=bool,
-                    default=default_val,
-                    underscore=underscore,
-                )
-            else:
-                if sequence and has_default and not isinstance(default_val, list):
-                    value_error("Default for list argument must be of list type")
-                choices = None
-                if is_enum(arg_typ) or is_choices(arg_typ):
-                    if is_enum(arg_typ):
-                        value_type = arg_typ
-                        choices = tuple(arg_typ)
-                    else:
-                        value_type = str
-                        choices = unwrap_choices(arg_typ)
-                        if any(not isinstance(choice, str) for choice in choices):
-                            type_error("All choices must be strings")
-                    if has_default:
-                        if not all(
-                            x in choices or (x is None and nullable)
-                            for x in (default_val if sequence else [default_val])
-                        ):
-                            value_error("Value must be among valid choices")
-                else:
-                    if arg_typ not in _TYPE_CONVERSION_FN and not callable(arg_typ):
-                        type_error("Unsupported type")
-                    value_type = arg_typ
-                spec = ArgumentSpec(
-                    kind=ArgumentKind.SEQUENCE if sequence else ArgumentKind.NORMAL,
-                    nullable=nullable,
-                    required=required,
-                    type=value_type,
-                    choices=choices,
-                    default=default_val,
-                    underscore=underscore,
-                )
+            spec = _generate_argument_spec(
+                arg_name, arg_type, has_default, underscore=underscore
+            )
+            if has_default:
+                spec = spec.with_default(namespace[arg_name])
+            elif spec.kind == ArgumentKind.NORMAL and spec.nullable:
+                spec = spec.with_default(None)
             arguments[arg_name] = spec
 
         # The parser will be lazily constructed when the `Arguments` instance is first
         # initialized.
         cls.__arguments__ = arguments
         return cls
-
-    def build_parser(cls) -> ArgumentParser:
-        """Create the :class:`ArgumentParser` for this :class:`Arguments` class."""
-        parser = ArgumentParser()
-        for name, spec in cls.__arguments__.items():
-            arg_name = name if spec.underscore else name.replace("_", "-")
-            arg_name = f"--{arg_name}"
-            if spec.kind in {ArgumentKind.NORMAL, ArgumentKind.SEQUENCE}:
-                arg_type = spec.type
-                conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
-                if spec.nullable:
-                    conversion_fn = _optional_wrapper_fn(conversion_fn)
-                kwargs: Dict[str, Any] = {
-                    "required": spec.required,
-                    "type": conversion_fn,
-                }
-                if spec.choices is not None:
-                    if spec.nullable:
-                        kwargs["choices"] = spec.choices + (None,)
-                    else:
-                        kwargs["choices"] = spec.choices
-                    if is_enum(spec.type):
-                        # Display only the enum names in help.
-                        kwargs["metavar"] = (
-                            "{" + ",".join(val.name for val in spec.choices) + "}"
-                        )
-                if not spec.required:
-                    kwargs["default"] = spec.default
-                if spec.kind == ArgumentKind.SEQUENCE:
-                    kwargs["nargs"] = "*"
-                parser.add_argument(arg_name, **kwargs)
-            else:
-                assert spec.default is not None
-                parser.add_switch_argument(arg_name, spec.default, spec.underscore)
-
-        if cls.__module__ != "__main__":
-            # Usually arguments are defined in the same script that is directly
-            # run (__main__). If this is not the case, add a note in help message
-            # indicating where the arguments are defined.
-            parser.epilog = (
-                f"Note: Arguments defined in {cls.__module__}.{cls.__name__}"
-            )
-        return parser
 
 
 class Arguments(metaclass=ArgumentsMeta, _root=True):
@@ -423,10 +485,13 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
     """
 
     def __init__(self, args: Optional[List[str]] = None):
-        if not hasattr(self.__class__, "__parser__"):
-            self.__class__.__parser__ = self.__class__.build_parser()
-        namespace = self.__class__.__parser__.parse_args(args)
-        for arg_name in argument_specs(self.__class__):
+        cls = self.__class__
+        if not hasattr(cls, "__parser__"):
+            parser = _build_parser(cls.__arguments__, cls)
+
+            cls.__parser__ = parser
+        namespace = cls.__parser__.parse_args(args)
+        for arg_name in argument_specs(cls):
             setattr(self, arg_name, getattr(namespace, arg_name))
 
     def to_dict(self) -> "OrderedDict[str, Any]":
@@ -456,10 +521,9 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
 
         k_col = "Arguments"
         v_col = "Values"
-        valid_keys = list(argument_specs(self.__class__).keys())
-        valid_vals = [repr(getattr(self, k)) for k in valid_keys]
-        max_key = max(len(k_col), max(len(k) for k in valid_keys))
-        max_val = max(len(v_col), max(len(v) for v in valid_vals))
+        arg_reprs = {k: repr(v) for k, v in self.to_dict().items()}
+        max_key = max(len(k_col), max(len(k) for k in arg_reprs.keys()))
+        max_val = max(len(v_col), max(len(v) for v in arg_reprs.values()))
         margin_col = 7  # table frame & spaces
         if width is not None:
             max_val = width - max_key - margin_col
@@ -478,7 +542,7 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
         s += f"╔═{'═' * max_key}═╤═{'═' * max_val}═╗\n"
         s += get_row(k_col, v_col)
         s += f"╠═{'═' * max_key}═╪═{'═' * max_val}═╣\n"
-        for k, v in zip(valid_keys, valid_vals):
+        for k, v in arg_reprs.items():
             s += get_row(k, v)
         s += f"╚═{'═' * max_key}═╧═{'═' * max_val}═╝\n"
         return s

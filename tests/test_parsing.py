@@ -6,8 +6,8 @@ from typing import List, Optional
 import pytest
 from typing_extensions import Literal
 
-from argtyped import *
-from argtyped.arguments import _TYPE_CONVERSION_FN
+from argtyped.arguments import _TYPE_CONVERSION_FN, Arguments, argument_specs
+from argtyped.custom_types import Enum, Switch, auto
 
 
 class MyLoggingLevels(Enum):

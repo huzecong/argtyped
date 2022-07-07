@@ -4,19 +4,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0]
+## [0.4.0] - 2022-07-07
+### Added
+- Support for parsing arguments based on `attrs` attributes.
+
 ### Changed
 - Removed `Choices` in favor of `Literal`.
 - Changed packaging and tool configurations to using `pyproject.toml`.
-- Fixed a bug where arguments are not collected in the correct method resolution order (MRO).
-- Renamed certain fields in `ArgumentSpecs`.
+- Changed certain fields in `ArgumentSpecs`; added a note that this class is internal and offers no stability 
+  guarantees.
 
-## [0.3.1]
+### Fixed
+- Fixed a bug where arguments are not collected in the correct method resolution order (MRO).
+
+## [0.3.1] - 2021-05-16
 ### Added
 - Support for `snake_case` (underscore style) arguments. (#6)
 - A `DeprecationWarning` is now shown when using `Choices` instead of `Literal`.
 
-## [0.3.0]
+## [0.3.0] - 2021-01-08
 ### Added
 - Support for list arguments. (#1)
 - `__repr__` method for `Arguments`. (#2)
@@ -58,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbers.
 - Switch types: `Switch`.
 
-[Unreleased]: https://github.com/huzecong/argtyped/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/huzecong/argtyped/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/huzecong/argtyped/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/huzecong/argtyped/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/huzecong/argtyped/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/huzecong/argtyped/compare/v0.1...v0.2.0

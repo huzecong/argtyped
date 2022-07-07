@@ -18,6 +18,7 @@ load-plugins = [
 disable = [
     "missing-module-docstring",
     "bad-mcs-classmethod-argument",  # I prefer `mcs` over `cls`
+    "too-few-public-methods",
     "too-many-branches",
     "too-many-locals",
     "too-many-statements",
@@ -29,7 +30,7 @@ enable = [
 
 [tool.pylint.basic]
 include-naming-hint = true
-typevar-rgx = "^([A-Z]|T([A-Z][a-z])*)$"
+typevar-rgx = "^([A-Z]|T([A-Z][a-z]*)*)$"
 # snake_case, but with no lower bound on name length
 argument-rgx = "([^\\W\\dA-Z][^\\WA-Z]*|_[^\\WA-Z]*|__[^\\WA-Z\\d_][^\\WA-Z]+__)$"
 variable-rgx = "([^\\W\\dA-Z][^\\WA-Z]*|_[^\\WA-Z]*|__[^\\WA-Z\\d_][^\\WA-Z]+__)$"
