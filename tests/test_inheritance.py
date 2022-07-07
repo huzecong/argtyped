@@ -42,9 +42,10 @@ def test_underscore_inheritance():
 def test_argument_specs():
     base_specs = {
         "a": ArgumentSpec(
-            kind=ArgumentKind.NORMAL, nullable=False, required=True, type=int
+            name="a", kind=ArgumentKind.NORMAL, nullable=False, required=True, type=int
         ),
         "b": ArgumentSpec(
+            name="b",
             kind=ArgumentKind.NORMAL,
             nullable=True,
             required=False,
@@ -52,6 +53,7 @@ def test_argument_specs():
             default=None,
         ),
         "c": ArgumentSpec(
+            name="c",
             kind=ArgumentKind.NORMAL,
             nullable=False,
             required=False,
@@ -59,6 +61,7 @@ def test_argument_specs():
             default="abc",
         ),
         "d": ArgumentSpec(
+            name="d",
             kind=ArgumentKind.SWITCH,
             nullable=False,
             required=False,
@@ -68,6 +71,7 @@ def test_argument_specs():
     }
     underscore_specs = {
         "underscore_arg": ArgumentSpec(
+            name="underscore_arg",
             kind=ArgumentKind.NORMAL,
             nullable=False,
             required=True,
@@ -75,6 +79,7 @@ def test_argument_specs():
             underscore=True,
         ),
         "underscore_switch": ArgumentSpec(
+            name="underscore_switch",
             kind=ArgumentKind.SWITCH,
             nullable=False,
             required=False,
@@ -90,6 +95,7 @@ def test_argument_specs():
             for name, specs in underscore_specs.items()
         },
         "b": ArgumentSpec(
+            name="b",
             kind=ArgumentKind.NORMAL,
             nullable=False,
             required=False,
@@ -98,6 +104,7 @@ def test_argument_specs():
             default="b",
         ),
         "c": ArgumentSpec(
+            name="c",
             kind=ArgumentKind.NORMAL,
             nullable=False,
             required=True,
@@ -105,7 +112,11 @@ def test_argument_specs():
             choices=(MyEnum.A, MyEnum.B),
         ),
         "e": ArgumentSpec(
-            kind=ArgumentKind.NORMAL, nullable=False, required=True, type=float
+            name="e",
+            kind=ArgumentKind.NORMAL,
+            nullable=False,
+            required=True,
+            type=float,
         ),
     }
     assert dict(argument_specs(BaseArgs)) == base_specs

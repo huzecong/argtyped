@@ -13,6 +13,9 @@ Python. Compared with `argparse`, this library gives you:
 - Type checking and IDE auto-completion for command line arguments.
 - A drop-in replacement for `argparse` in most cases.
 
+Since v0.4.0, `argtyped` also supports parsing arguments defined with an [attrs](https://attrs.org/)-class. See
+[Attrs Support](#attrs-support-new) for more details.  
+
 
 ## Installation
 
@@ -49,7 +52,7 @@ class MyArguments(Arguments):
     model_name: str         # required argument of `str` type
     hidden_size: int = 512  # `int` argument with default value of 512
 
-    activation: Literal['relu', 'tanh', 'sigmoid'] = 'relu'  # argument with limited choices
+    activation: Literal["relu", "tanh", "sigmoid"] = "relu"  # argument with limited choices
     logging_level: LoggingLevels = LoggingLevels.Info        # using `Enum` class as choices
 
     use_dropout: Switch = True  # switch argument, enable with "--use-dropout" and disable with "--no-use-dropout"
@@ -121,6 +124,72 @@ Arguments can also be pretty-printed:
 ```
 It is recommended though to use the `args.to_string()` method, which gives you control of the table width.
 
+## Attrs Support (New)
+
+The way we define the arguments is very similar to defining a [dataclass](https://docs.python.org/3/library/dataclasses.html)
+or an [attrs](https://attrs.org)-class, so it seems natural to just write an attrs-class, and add parsing support to it.
+
+To use `argtyped` with `attrs`, simply define an attrs-class as usual, and have it subclass `AttrsArguments`. Here's 
+the same example above, but implemented with attrs-classes, and with some bells and whistles:
+```python
+import attr  # note: new style `attrs` syntax is also supported
+from argtyped import AttrsArguments
+
+def _convert_logging_level(s: str) -> LoggingLevels:
+    # Custom conversion function that takes the raw string value from the command line.
+    return LoggingLevels[s.lower()]
+
+@attr.s(auto_attribs=True)
+class MyArguments(AttrsArguments):
+    model_name: str = attr.ib(metadata={"positional": True})  # positional argument
+    # Or: `model_name: str = argtyped.positional_arg()`.
+    layer_sizes: List[int] = attr.ib(metadata={"nargs": "+"})  # other metadata are treated as `argparse` options
+
+    activation: Literal["relu", "tanh", "sigmoid"] = "relu"
+    logging_level: LoggingLevels = attr.ib(default=LoggingLevels.Info, converter=_convert_logging_level)
+
+    use_dropout: Switch = True
+    dropout_prob: Optional[float] = 0.5
+
+    _activation_fn: Callable[[float], float] = attr.ib(init=False)  # `init=False` attributes are not parsed
+
+    @dropout_prob.validator  # validators still work as you would expect
+    def _dropout_prob_validator(self, attribute, value):
+        if not 0.0 <= value <= 1.0:
+            raise ValueError(f"Invalid probability {value}")
+
+    @_activation_fn.default
+    def _activation_fn(self):
+        return _ACTIVATION_FNS[self.activation]
+```
+
+A few things to note here:
+- You can define positional arguments by adding `"positional": True` as metadata. If this feels unnatural, you could 
+  also use `argtyped.positional_arg()`, which takes the same arguments as `attr.ib`.
+- You can pass additional options to `ArgumentParser.add_argument` by listing them as metadata as well. Note that 
+  these options take precedence over `argtyped`'s computed arguments, for example, sequence arguments (`List[T]`) by 
+  default uses `nargs="*"`, but you could override it with metadata.
+- Attributes with custom converters will not be parsed; its converter will be called with the raw string value from
+  command line. If the attribute also has a default value, you should make sure that your converter works with both
+  strings and the default value.
+- `init=False` attributes are not treated as arguments, but they can be useful for storing computed values based on
+  arguments.
+- The default value logic is the same as normal attrs classes, and thus could be different from non-attrs `argtyped` 
+  classes. For example, optional arguments are not considered to have an implicit default of `None`, and no type 
+  validation is performed on default values.
+
+Here are the (current) differences between an attrs-based arguments class (`AttrsArguments`) versus the normal arguments
+class (`Arguments`):
+- `AttrsArguments` supports positional arguments and custom options via metadata.
+- `AttrsArguments` handles default values with attrs, so there's no validation of default value types.  This also 
+  means that nullable arguments must have an explicit default value of `None`, otherwise it becomes a required 
+  argument.
+- `AttrsArguments` does not support `underscore=True`.
+- `AttrsArguments` does not have `to_dict`, `to_string` methods.
+- `AttrsArguments` needs to be called with the factory `parse_args` method to parse, while `Arguments` parses command 
+  line arguments on construction.
+
+
 ## Reference
 
 ### The `argtyped.Arguments` Class
@@ -132,7 +201,7 @@ When an instance of your custom class is initialized, the command line arguments
 with your annotated types. You can also provide the list of strings to parse by passing them as the parameter.
 
 The parsed arguments are stored in an object of your custom type. This gives you arguments that can be auto-completed
-by the IDE, and type-checked by a static type checker like [`mypy`](http://mypy-lang.org/).
+by the IDE, and type-checked by a static type checker like [mypy](http://mypy-lang.org/).
 
 The following example illustrates the keypoints:
 ```python
