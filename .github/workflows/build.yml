@@ -65,9 +65,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Build dists
         run: |
-          pip install wheel
-          python setup.py sdist
-          python setup.py bdist_wheel
+          pip install build wheel
+          python -m build
       - name: Publish to PyPI
         run: |
           pip install --upgrade twine
@@ -87,7 +86,7 @@ jobs:
         with:
           path: "repo"
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v1
+        uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install PyPI package
@@ -96,5 +95,5 @@ jobs:
       - name: Unit test with PyPI package
         run: |
           pip install pytest
-          pip install typing-extensions
+          pip install typing-extensions attrs
           python -m pytest repo/
