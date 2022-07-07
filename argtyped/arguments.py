@@ -1,4 +1,5 @@
 import argparse
+import enum
 import functools
 import shutil
 import sys
@@ -31,6 +32,7 @@ from argtyped.custom_types import (
 
 __all__ = [
     "Arguments",
+    "ArgumentKind",
     "ArgumentSpec",
     "argument_specs",
 ]
@@ -107,16 +109,34 @@ _TYPE_CONVERSION_FN: Dict[type, ConversionFn[Any]] = {
 }
 
 
+class ArgumentKind(enum.Enum):
+    """
+    The kind of argument:
+
+    - ``NORMAL``: A normal argument that takes a single value.
+    - ``SWITCH``: A boolean switch argument that takes no values; it is set to True with
+      ``--argument`` and False with ``--no-argument``
+      (``action="store_true"/"store_false"``).
+    - ``SEQUENCE``: A sequential argument that takes multiple values (``nargs="+"``).
+    """
+
+    NORMAL = 0
+    SWITCH = 1
+    SEQUENCE = 2
+
+
 class ArgumentSpec(NamedTuple):
     """Internal specs of an argument."""
 
     nullable: bool
     required: bool
-    value_type: type
-    type: str  # Literal["normal", "switch", "sequence"]
+    type: type
+    kind: ArgumentKind
     choices: Optional[Tuple[Any, ...]] = None
     default: Optional[Any] = None
     underscore: bool = False  # True for `--snake_case` args, False for `--kebab-case`
+    # True if argument was defined in a base class and not overridden in current class.
+    inherited: bool = False
 
 
 class ArgumentsMeta(ABCMeta):
@@ -124,7 +144,7 @@ class ArgumentsMeta(ABCMeta):
     Metaclass for :class:`Arguments`. The type annotations are parsed and converted into
     an ``argparse.ArgumentParser`` on class creation.
     """
-    __parser__: Optional[ArgumentParser]
+    __parser__: ArgumentParser
     __arguments__: "OrderedDict[str, ArgumentSpec]"
 
     def __new__(  # type: ignore[misc]
@@ -142,15 +162,20 @@ class ArgumentsMeta(ABCMeta):
         if not root and not issubclass(cls, Arguments):
             raise TypeError(f"Type {cls.__name__!r} must inherit from `Arguments`")
         if root:
-            cls.__parser__ = None
             cls.__arguments__ = OrderedDict()
             return cls
 
         arguments: "OrderedDict[str, ArgumentSpec]" = OrderedDict()
-        for base in reversed(bases):
+        for base in reversed(cls.mro()[1:]):
             # Use reversed order so derived classes can override base annotations.
             if issubclass(base, Arguments):
-                arguments.update(argument_specs(base))
+                for arg_name, spec in argument_specs(base).items():
+                    if spec.inherited:
+                        # Skip inherited attributes -- they should have been included
+                        # already when we processed the base class, which is higher up
+                        # in the MRO.
+                        continue
+                    arguments[arg_name] = spec._replace(inherited=True)
 
         # Check if there are arguments with default values but without annotations.
         annotations = getattr(cls, "__annotations__", {})
@@ -221,10 +246,10 @@ class ArgumentsMeta(ABCMeta):
                 if not isinstance(default_val, bool):
                     value_error("Switch argument must have a boolean default value")
                 spec = ArgumentSpec(
-                    type="switch",
+                    kind=ArgumentKind.SWITCH,
                     nullable=False,
                     required=False,
-                    value_type=bool,
+                    type=bool,
                     default=default_val,
                     underscore=underscore,
                 )
@@ -252,10 +277,10 @@ class ArgumentsMeta(ABCMeta):
                         type_error("Unsupported type")
                     value_type = arg_typ
                 spec = ArgumentSpec(
-                    type="sequence" if sequence else "normal",
+                    kind=ArgumentKind.SEQUENCE if sequence else ArgumentKind.NORMAL,
                     nullable=nullable,
                     required=required,
-                    value_type=value_type,
+                    type=value_type,
                     choices=choices,
                     default=default_val,
                     underscore=underscore,
@@ -264,7 +289,6 @@ class ArgumentsMeta(ABCMeta):
 
         # The parser will be lazily constructed when the `Arguments` instance is first
         # initialized.
-        cls.__parser__ = None
         cls.__arguments__ = arguments
         return cls
 
@@ -274,8 +298,8 @@ class ArgumentsMeta(ABCMeta):
         for name, spec in cls.__arguments__.items():
             arg_name = name if spec.underscore else name.replace("_", "-")
             arg_name = f"--{arg_name}"
-            if spec.type in {"normal", "sequence"}:
-                arg_type = spec.value_type
+            if spec.kind in {ArgumentKind.NORMAL, ArgumentKind.SEQUENCE}:
+                arg_type = spec.type
                 conversion_fn = _TYPE_CONVERSION_FN.get(arg_type, arg_type)
                 if spec.nullable:
                     conversion_fn = _optional_wrapper_fn(conversion_fn)
@@ -288,14 +312,14 @@ class ArgumentsMeta(ABCMeta):
                         kwargs["choices"] = spec.choices + (None,)
                     else:
                         kwargs["choices"] = spec.choices
-                    if is_enum(spec.value_type):
+                    if is_enum(spec.type):
                         # Display only the enum names in help.
                         kwargs["metavar"] = (
                             "{" + ",".join(val.name for val in spec.choices) + "}"
                         )
                 if not spec.required:
                     kwargs["default"] = spec.default
-                if spec.type == "sequence":
+                if spec.kind == ArgumentKind.SEQUENCE:
                     kwargs["nargs"] = "*"
                 parser.add_argument(arg_name, **kwargs)
             else:
@@ -399,7 +423,7 @@ class Arguments(metaclass=ArgumentsMeta, _root=True):
     """
 
     def __init__(self, args: Optional[List[str]] = None):
-        if self.__class__.__parser__ is None:
+        if not hasattr(self.__class__, "__parser__"):
             self.__class__.__parser__ = self.__class__.build_parser()
         namespace = self.__class__.__parser__.parse_args(args)
         for arg_name in argument_specs(self.__class__):

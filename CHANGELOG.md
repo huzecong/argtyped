@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Removed `Choices` in favor of `Literal`.
 - Changed packaging and tool configurations to using `pyproject.toml`.
+- Fixed a bug where arguments are not collected in the correct method resolution order (MRO).
+- Renamed certain fields in `ArgumentSpecs`.
 
 ## [0.3.1]
 ### Added
